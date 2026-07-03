@@ -4,7 +4,9 @@ import SwiftUI
 
 @MainActor
 enum FlowRunner {
+    /// inputs: 実行時フォームで入力された値（stepId → 値）で該当ステップの値を上書き
     static func run(_ flow: Flow, model: BrowserModel, creds: CredentialStore,
+                    inputs: [String: String] = [:],
                     status: @escaping (String) -> Void) async {
         status("▶ \(flow.name) を実行中…")
         var cred: (username: String, password: String)?
@@ -23,12 +25,74 @@ enum FlowRunner {
             if step.delayMs > 0 { try? await Task.sleep(nanoseconds: UInt64(step.delayMs) * 1_000_000) }
             var type = step.type.rawValue
             var value = step.value
+            if step.promptAtRun, let ov = inputs[step.id] { value = ov }   // 実行時入力で上書き
             if step.type == .fillUsername { type = "input"; value = cred?.username ?? "" }
             if step.type == .fillPassword { type = "input"; value = cred?.password ?? "" }
             let ok = await model.runStep(type: type, selector: step.selector, value: value, timeoutMs: step.timeoutMs)
             if !ok { status("⚠ 停止: 「\(step.type.title)」で失敗"); return }
         }
         status("✓ \(flow.name) が完了しました")
+    }
+}
+
+// MARK: - 実行前の入力フォーム（勤怠などで実行時に値を入れて自動投入）
+
+struct RunInputSheet: View {
+    let flow: Flow
+    let onRun: ([String: String]) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var values: [String: String]
+
+    init(flow: Flow, onRun: @escaping ([String: String]) -> Void) {
+        self.flow = flow; self.onRun = onRun
+        var v: [String: String] = [:]
+        for s in flow.steps where s.promptAtRun { v[s.id] = s.value ?? "" }
+        _values = State(initialValue: v)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(flow.name).font(.system(size: 16, weight: .bold))
+                    if !flow.note.isEmpty {
+                        Text(flow.note).font(.system(size: 12)).foregroundColor(.secondary)
+                    }
+                }
+                Section("入力内容") {
+                    ForEach(flow.promptSteps) { s in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(label(s)).font(.system(size: 12)).foregroundColor(.secondary)
+                            if s.secureInput {
+                                SecureField("入力", text: binding(s.id))
+                            } else {
+                                TextField("入力", text: binding(s.id))
+                                    .autocapitalization(.none).autocorrectionDisabled()
+                            }
+                        }
+                    }
+                }
+                Section {
+                    Text("「実行」を押すと、入力した内容を自動でページに反映し、送信まで実行します。")
+                        .font(.system(size: 11)).foregroundColor(.secondary)
+                }
+            }
+            .navigationTitle("実行前の入力").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("キャンセル") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("実行") { onRun(values); dismiss() }
+                }
+            }
+        }
+    }
+
+    private func label(_ s: FlowStep) -> String {
+        if let l = s.promptLabel, !l.isEmpty { return l }
+        return s.type.title
+    }
+    private func binding(_ id: String) -> Binding<String> {
+        Binding(get: { values[id] ?? "" }, set: { values[id] = $0 })
     }
 }
 
@@ -127,8 +191,16 @@ struct FlowWizardView: View {
                                 }
                             }
                             if step.type.needsValue {
-                                TextField(step.type == .wait ? "待機ミリ秒" : "値", text: Binding($step.value, ""))
+                                TextField(valuePlaceholder(step), text: Binding($step.value, ""))
                                     .autocapitalization(.none).autocorrectionDisabled()
+                            }
+                            if step.type == .input || step.type == .select {
+                                Toggle("実行時に入力を求める", isOn: $step.promptAtRun).font(.system(size: 13))
+                                if step.promptAtRun {
+                                    TextField("フォームの見出し（例: 出勤時刻）", text: Binding($step.promptLabel, ""))
+                                        .font(.system(size: 13))
+                                    Toggle("入力を伏せ字にする", isOn: $step.secureInput).font(.system(size: 13))
+                                }
                             }
                         }
                     }
@@ -148,7 +220,17 @@ struct FlowWizardView: View {
                     }
                 }
 
-                Section { Toggle("有効", isOn: $flow.enabled) }
+                Section {
+                    Toggle("有効", isOn: $flow.enabled)
+                    Toggle("ホーム画面にアイコンを表示", isOn: $flow.pinnedToHome)
+                    if flow.promptSteps.isEmpty {
+                        Text("実行時入力なし: タップですぐ実行します。")
+                            .font(.system(size: 11)).foregroundColor(.secondary)
+                    } else {
+                        Text("実行時入力あり: 実行前に \(flow.promptSteps.count) 項目の入力フォームを表示します。")
+                            .font(.system(size: 11)).foregroundColor(.secondary)
+                    }
+                }
             }
             .navigationTitle(editing == nil ? "フローを作成" : "フローを編集")
             .navigationBarTitleDisplayMode(.inline)
@@ -168,6 +250,10 @@ struct FlowWizardView: View {
         if let i = flowStore.flows.firstIndex(where: { $0.id == flow.id }) { flowStore.flows[i] = flow }
         else { flowStore.flows.append(flow) }
         dismiss()
+    }
+    private func valuePlaceholder(_ step: FlowStep) -> String {
+        if step.type == .wait { return "待機ミリ秒" }
+        return step.promptAtRun ? "既定値（実行時に編集可）" : "値"
     }
     private func dismissKeyboard() {
         #if !targetEnvironment(macCatalyst)

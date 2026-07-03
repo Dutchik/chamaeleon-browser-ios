@@ -48,10 +48,32 @@ struct FlowStep: Codable, Identifiable, Equatable {
     var id = UUID().uuidString
     var type: FlowActionType = .click
     var selector: String?
-    var value: String?
+    var value: String?          // 既定値。promptAtRun時は実行フォームの初期値
     var url: String?
     var delayMs: Int = 300
     var timeoutMs: Int = 12000
+    var promptAtRun = false      // 実行時に値の入力を求める
+    var promptLabel: String?     // 実行フォームでの見出し（例:「出勤時刻」）
+    var secureInput = false      // 実行フォームで伏せ字入力
+
+    init() {}
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, selector, value, url, delayMs, timeoutMs, promptAtRun, promptLabel, secureInput
+    }
+    init(from d: Decoder) throws {
+        let c = try d.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        type = try c.decodeIfPresent(FlowActionType.self, forKey: .type) ?? .click
+        selector = try c.decodeIfPresent(String.self, forKey: .selector)
+        value = try c.decodeIfPresent(String.self, forKey: .value)
+        url = try c.decodeIfPresent(String.self, forKey: .url)
+        delayMs = try c.decodeIfPresent(Int.self, forKey: .delayMs) ?? 300
+        timeoutMs = try c.decodeIfPresent(Int.self, forKey: .timeoutMs) ?? 12000
+        promptAtRun = try c.decodeIfPresent(Bool.self, forKey: .promptAtRun) ?? false
+        promptLabel = try c.decodeIfPresent(String.self, forKey: .promptLabel)
+        secureInput = try c.decodeIfPresent(Bool.self, forKey: .secureInput) ?? false
+    }
 }
 
 struct Flow: Codable, Identifiable, Equatable {
@@ -64,9 +86,13 @@ struct Flow: Codable, Identifiable, Equatable {
     var startUrl = ""
     var useCredentials = false
     var credentialId: String?
+    var pinnedToHome = false
     var steps: [FlowStep] = []
     var createdAt = ISO8601DateFormatter().string(from: Date())
     var updatedAt = ISO8601DateFormatter().string(from: Date())
+
+    /// 実行時に入力を求めるステップ
+    var promptSteps: [FlowStep] { steps.filter { $0.promptAtRun } }
 
     func matches(_ url: String) -> Bool {
         var p = SiteProfile()
@@ -79,7 +105,7 @@ struct Flow: Codable, Identifiable, Equatable {
     // 旧バージョンで保存したフロー（note等が無い）も読めるよう寛容にデコード
     enum CodingKeys: String, CodingKey {
         case id, name, note, enabled, matchType, matchPattern, startUrl
-        case useCredentials, credentialId, steps, createdAt, updatedAt
+        case useCredentials, credentialId, pinnedToHome, steps, createdAt, updatedAt
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -92,6 +118,7 @@ struct Flow: Codable, Identifiable, Equatable {
         startUrl = try c.decodeIfPresent(String.self, forKey: .startUrl) ?? ""
         useCredentials = try c.decodeIfPresent(Bool.self, forKey: .useCredentials) ?? false
         credentialId = try c.decodeIfPresent(String.self, forKey: .credentialId)
+        pinnedToHome = try c.decodeIfPresent(Bool.self, forKey: .pinnedToHome) ?? false
         steps = try c.decodeIfPresent([FlowStep].self, forKey: .steps) ?? []
         createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt) ?? ISO8601DateFormatter().string(from: Date())
         updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt) ?? ISO8601DateFormatter().string(from: Date())

@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var showCreds = false
     @State private var editor: InlineEditor = .none
     @State private var wizardFlow: Flow?
+    @State private var runInputFlow: Flow?
     @State private var flowStatus: String?
     @FocusState private var urlFocused: Bool
 
@@ -73,6 +74,11 @@ struct ContentView: View {
         .sheet(item: $wizardFlow) { f in
             if let m = active { FlowWizardView(flowStore: flowStore, credStore: credStore, model: m, editing: f) }
         }
+        .sheet(item: $runInputFlow) { f in
+            RunInputSheet(flow: f) { inputs in
+                if let m = active { execFlow(f, model: m, inputs: inputs) }
+            }
+        }
     }
 
     // MARK: - インライン編集パネル
@@ -114,9 +120,9 @@ struct ContentView: View {
                         library.recordVisit(url: url, title: title)
                     }
                     if model.isHome {
-                        StartView(settings: settings, library: library) { target in
-                            model.navigate(target)
-                        }
+                        StartView(settings: settings, library: library, flowStore: flowStore,
+                                  onSearch: { target in model.navigate(target) },
+                                  onRunFlow: { flow in runFlow(flow, model: model) })
                     }
                 }
                 .opacity(index == activeIndex ? 1 : 0)
@@ -162,8 +168,18 @@ struct ContentView: View {
     }
 
     private func runFlow(_ flow: Flow, model: BrowserModel) {
+        // 実行時入力があるフローは、まずフォームを表示
+        if !flow.promptSteps.isEmpty {
+            runInputFlow = flow
+        } else {
+            execFlow(flow, model: model, inputs: [:])
+        }
+    }
+
+    private func execFlow(_ flow: Flow, model: BrowserModel, inputs: [String: String]) {
+        model.isHome = false   // ホームから起動された場合はページを表示
         Task {
-            await FlowRunner.run(flow, model: model, creds: credStore) { s in flowStatus = s }
+            await FlowRunner.run(flow, model: model, creds: credStore, inputs: inputs) { s in flowStatus = s }
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             flowStatus = nil
         }

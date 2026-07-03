@@ -4,9 +4,13 @@ import SwiftUI
 struct StartView: View {
     @ObservedObject var settings: AppSettingsStore
     @ObservedObject var library: LibraryStore
+    @ObservedObject var flowStore: FlowStore
     let onSearch: (String) -> Void
+    let onRunFlow: (Flow) -> Void
     @State private var query = ""
     @FocusState private var focused: Bool
+
+    private var pinnedFlows: [Flow] { flowStore.flows.filter { $0.pinnedToHome } }
 
     var body: some View {
         ZStack {
@@ -44,9 +48,33 @@ struct StartView: View {
                         .background(Color.green).foregroundColor(.black).cornerRadius(12)
                 }.padding(.horizontal, 16)
 
-                // ブックマーク
-                if !library.bookmarks.isEmpty {
-                    ScrollView {
+                ScrollView {
+                    // 自動化（ホームに固定したフロー）
+                    if !pinnedFlows.isEmpty {
+                        sectionHeader("自動化")
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 14) {
+                            ForEach(pinnedFlows) { f in
+                                Button { onRunFlow(f) } label: {
+                                    VStack(spacing: 6) {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(LinearGradient(colors: [.green, Color(red: 0.1, green: 0.5, blue: 0.35)],
+                                                                     startPoint: .top, endPoint: .bottom))
+                                                .frame(width: 46, height: 46)
+                                            Image(systemName: f.promptSteps.isEmpty ? "bolt.fill" : "square.and.pencil")
+                                                .font(.system(size: 20, weight: .bold)).foregroundColor(.white)
+                                        }
+                                        Text(f.name.isEmpty ? "フロー" : f.name)
+                                            .font(.system(size: 11)).foregroundColor(.white.opacity(0.85)).lineLimit(1)
+                                    }
+                                }
+                            }
+                        }.padding(.horizontal, 16).padding(.bottom, 6)
+                    }
+
+                    // ブックマーク
+                    if !library.bookmarks.isEmpty {
+                        sectionHeader("ブックマーク")
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 14) {
                             ForEach(library.bookmarks.prefix(12)) { b in
                                 Button { onSearch(b.url) } label: {
@@ -64,6 +92,13 @@ struct StartView: View {
                 Spacer()
             }
         }
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        HStack {
+            Text(title).font(.system(size: 13, weight: .semibold)).foregroundColor(.white.opacity(0.6))
+            Spacer()
+        }.padding(.horizontal, 16).padding(.top, 8)
     }
 
     private func search() {
