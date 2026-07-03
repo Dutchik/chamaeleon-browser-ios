@@ -277,25 +277,37 @@ enum PatchEngine {
 
 /// webページに注入するJavaScript群
 enum BrowserJS {
+    // 安定セレクタ生成: id / data-* / name / aria-label / 安定クラスを優先し、
+    // 必要なときだけ nth-of-type にフォールバック（自動化・スタイル編集の再現性向上）
+    static let selJS = """
+      function stab(el){ if(!el||el.nodeType!==1)return null;
+        if(el.id&&!/^[0-9]/.test(el.id)&&!/[0-9]{4,}/.test(el.id))return '#'+CSS.escape(el.id);
+        var A=['data-testid','data-test','data-qa','data-cy','name','aria-label'];
+        for(var i=0;i<A.length;i++){var v=el.getAttribute&&el.getAttribute(A[i]);
+          if(v){v=v.replace(/["']/g,'');if(v)return el.tagName.toLowerCase()+'['+A[i]+'="'+v+'"]';}}
+        return null;}
+      function sel(el){ if(!el||el.nodeType!==1)return '';
+        var s=stab(el);if(s)return s;
+        var parts=[],cur=el,depth=0;
+        while(cur&&cur.nodeType===1&&cur!==document.body&&depth<5){
+          var d=stab(cur);if(d){parts.unshift(d);break;}
+          var tag=cur.tagName.toLowerCase(),cls=null;
+          if(cur.classList){for(var i=0;i<cur.classList.length;i++){var c=cur.classList[i];
+            if(/^[a-zA-Z][A-Za-z0-9_-]{1,24}$/.test(c)&&!/[0-9]{4,}/.test(c)){cls=c;break;}}}
+          var pe=cur.parentElement,seg=cls?tag+'.'+CSS.escape(cls):tag;
+          if(pe){var same=[].slice.call(pe.children).filter(function(x){
+            if(x.tagName!==cur.tagName)return false;return cls?(x.classList&&x.classList.contains(cls)):true;});
+            if(same.length>1)seg=seg+':nth-of-type('+(same.indexOf(cur)+1)+')';}
+          parts.unshift(seg);cur=pe;depth++;}
+        return parts.join(' > ');}
+    """
+
     // レコーダー: クリック・入力を messageHandler へ送る
     static let recorder = """
     (function(){
       if (window.__chmRecInit) { window.__chmRec = true; return; }
       window.__chmRecInit = true; window.__chmRec = true;
-      function sel(el){
-        if(el.id) return '#'+CSS.escape(el.id);
-        var t=el.getAttribute('data-testid'); if(t) return '[data-testid=\\"'+t+'\\"]';
-        var n=el.getAttribute('name'); if(n) return el.tagName.toLowerCase()+'[name=\\"'+n+'\\"]';
-        var parts=[],cur=el;
-        while(cur&&cur!==document.body&&parts.length<4){
-          var p=cur.tagName.toLowerCase();
-          var pe=cur.parentElement;
-          if(pe){var same=[].slice.call(pe.children).filter(function(c){return c.tagName===cur.tagName;});
-            if(same.length>1)p+=':nth-of-type('+(same.indexOf(cur)+1)+')';}
-          parts.unshift(p);cur=pe;
-        }
-        return parts.join(' > ');
-      }
+    \(selJS)
       document.addEventListener('click',function(e){ if(!window.__chmRec)return;
         window.webkit.messageHandlers.chm.postMessage({kind:'recorded',type:'click',selector:sel(e.target)});},true);
       document.addEventListener('change',function(e){ if(!window.__chmRec)return; var el=e.target;
@@ -317,13 +329,7 @@ enum BrowserJS {
       tip.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483647;pointer-events:none;background:#2a7de1;color:#fff;font:600 12px -apple-system,sans-serif;padding:6px 12px;border-radius:999px';
       document.documentElement.appendChild(tip);
       var PROPS=['color','background-color','font-size','font-weight','display','opacity','width','height','max-width','margin','padding','border','border-radius','text-align','box-shadow'];
-      function sel(el){ if(!el)return ''; if(el.id)return '#'+CSS.escape(el.id);
-        var t=el.getAttribute&&el.getAttribute('data-testid'); if(t)return '[data-testid=\\"'+t+'\\"]';
-        var parts=[],cur=el;
-        while(cur&&cur!==document.body&&cur.nodeType===1&&parts.length<4){var p=cur.tagName.toLowerCase();var pe=cur.parentElement;
-          if(pe){var same=[].slice.call(pe.children).filter(function(c){return c.tagName===cur.tagName;});
-          if(same.length>1)p+=':nth-of-type('+(same.indexOf(cur)+1)+')';}parts.unshift(p);cur=pe;}
-        return parts.join(' > ');}
+    \(selJS)
       function at(x,y){return document.elementFromPoint(x,y);}   // ovは pointer-events:none なので下の要素が返る
       function highlight(el){ if(!el||el===ov||el===tip)return; var r=el.getBoundingClientRect();
         ov.style.left=r.left+'px';ov.style.top=r.top+'px';ov.style.width=r.width+'px';ov.style.height=r.height+'px'; }
