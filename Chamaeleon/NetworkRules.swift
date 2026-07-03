@@ -134,4 +134,15 @@ final class NetRuleStore: ObservableObject {
         let s = selector.trimmingCharacters(in: .whitespaces); guard !s.isEmpty else { return }
         rules.append(NetRule(enabled: true, selector: s, domain: domain, action: .hide))
     }
+    /// 「移動したくない宛先」を入力 → その宛先へのリンク要素を一括で隠し、ナビゲーションもブロック
+    func addLinkTargetBlock(_ raw: String, domain: String? = nil) {
+        var t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let r = t.range(of: "://") { t = String(t[r.upperBound...]) }   // scheme除去
+        t = t.replacingOccurrences(of: "\"", with: "")
+        guard !t.isEmpty else { return }
+        rules.append(contentsOf: [
+            NetRule(enabled: true, selector: "[href*=\"\(t)\"]", domain: domain, action: .hide, note: "リンク先ブロック"),
+            NetRule(enabled: true, pattern: t, action: .block, note: "リンク先ブロック"),
+        ])
+    }
 }

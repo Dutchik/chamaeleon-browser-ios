@@ -12,6 +12,8 @@ struct BlockRulesView: View {
     @State private var newSelector = ""
     @State private var scopeToSite = true
     @State private var picking = false
+    @State private var linkTarget = ""
+    @State private var linkScopeToSite = false
 
     private var host: String { URL(string: model.currentURL)?.host ?? "" }
 
@@ -53,6 +55,17 @@ struct BlockRulesView: View {
                         }.disabled(newSelector.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
+
+                Section {
+                    TextField("行きたくない宛先（例: example.com、affiliate.jp/ref）", text: $linkTarget)
+                        .font(.system(size: 13, design: .monospaced))
+                        .autocapitalization(.none).autocorrectionDisabled()
+                    Toggle("このサイト（\(host)）内のリンクだけ", isOn: $linkScopeToSite)
+                    Button("この宛先へのリンクを一括で隠す＋移動をブロック") {
+                        netRules.addLinkTargetBlock(linkTarget, domain: linkScopeToSite ? host : nil); linkTarget = ""
+                    }.disabled(linkTarget.trimmingCharacters(in: .whitespaces).isEmpty)
+                } header: { Text("リンク先ブロック") }
+                footer: { Text("入力した宛先へのリンク要素（[href*=…]）をページから一括で隠し、その宛先へのナビゲーションもブロックします。誤クリックで離脱したくないサイトに。") }
 
                 Section("登録済みルール（\(netRules.rules.count)）") {
                     ForEach($netRules.rules) { $r in

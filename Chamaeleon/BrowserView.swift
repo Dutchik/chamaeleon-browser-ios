@@ -27,8 +27,10 @@ struct BrowserView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "chm")
         if let list = netRules.compiledList { config.userContentController.add(list) }
         config.userContentController.addUserScript(ChamaeleonAgent.makeUserScript(store.profiles))  // 常駐ルールエンジン
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         if #available(iOS 16.0, *) { webView.isFindInteractionEnabled = true }
         context.coordinator.appliedRuleVersion = netRules.version
@@ -58,7 +60,7 @@ struct BrowserView: UIViewRepresentable {
     }
     func makeCoordinator() -> Coordinator { Coordinator(model: model, store: store, netRules: netRules, onVisit: onVisit) }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
         let model: BrowserModel
         let store: ProfileStore
         let netRules: NetRuleStore
@@ -69,11 +71,19 @@ struct BrowserView: UIViewRepresentable {
             self.model = model; self.store = store; self.netRules = netRules; self.onVisit = onVisit
         }
 
-        // メインフレームのナビゲーションを C エンジンで判定してブロック
+        // target=_blank / window.open で開こうとしたURLを同じWebViewで開く（白画面/リンク無反応の修正）
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                     for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            if let url = navigationAction.request.url { webView.load(URLRequest(url: url)) }
+            return nil
+        }
+
+        // メインフレームのナビゲーションを C エンジンで判定してブロック（http(s)のみ対象）
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             if netRules.masterEnabled, navigationAction.targetFrame?.isMainFrame ?? true,
-               let u = navigationAction.request.url?.absoluteString, chm_rules_eval(u) == 1 {
+               let u = navigationAction.request.url, let scheme = u.scheme?.lowercased(),
+               scheme == "http" || scheme == "https", chm_rules_eval(u.absoluteString) == 1 {
                 decisionHandler(.cancel); return
             }
             decisionHandler(.allow)
