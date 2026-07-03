@@ -111,6 +111,17 @@ static int domain_lookup(const char *dom) {
     return -1;
 }
 
+// s が p を「/区切りの先頭セグメントから」前方一致するか（p は末尾/を無視）
+static int seg_prefix(const char *s, const char *p) {
+    if (!s || !p) return 0;
+    size_t lp = strlen(p);
+    while (lp > 0 && p[lp - 1] == '/') lp--;   // 末尾スラッシュを無視
+    if (lp == 0) return 0;
+    if (strncmp(s, p, lp) != 0) return 0;
+    char nx = s[lp];
+    return (nx == 0 || nx == '/' || nx == '?' || nx == '#');   // セグメント境界で終わる
+}
+
 int chm_rules_eval(const char *url) {
     if (!url) return 0;
     char *lu = dup_lower(url);
@@ -131,10 +142,31 @@ int chm_rules_eval(const char *url) {
         }
     }
 
-    // (2) パス/部分一致系: 少数なので線形走査
+    // host+path（scheme除去・query/fragment除去）と path を用意
+    char hostpath[2048];
+    {
+        const char *a = strstr(lu, "://"); a = a ? a + 3 : lu;
+        size_t i = 0;
+        while (a[i] && a[i] != '?' && a[i] != '#' && i < sizeof(hostpath) - 1) { hostpath[i] = a[i]; i++; }
+        hostpath[i] = 0;
+    }
+    const char *path = strchr(hostpath, '/');   // 最初の '/' から（NULLの場合あり）
+
     int act = 0;
     for (int i = 0; i < g_subn; i++) {
-        if (strstr(lu, g_subs[i].pat)) { act = g_subs[i].action; break; }
+        const char *pat = g_subs[i].pat;
+        int m;
+        if (pat[0] != '/' && strchr(pat, '/')) {
+            // "host/path" 型 → host起点の前方セグメント一致のみ（部分一致で誤爆させない）
+            m = seg_prefix(hostpath, pat);
+        } else if (pat[0] == '/') {
+            // "/ads/" 等のパス断片 → 部分一致 or パス前方一致
+            m = (strstr(lu, pat) != NULL) || seg_prefix(path, pat);
+        } else {
+            // 単語 → 部分一致
+            m = strstr(lu, pat) != NULL;
+        }
+        if (m) { act = g_subs[i].action; break; }
     }
     free(lu);
     return act;
