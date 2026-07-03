@@ -3,7 +3,7 @@ import Security
 
 // PC版 src/shared/types.ts に対応する自動化フロー・検索エンジンのモデル。
 
-struct SearchEngine: Identifiable, Hashable {
+struct SearchEngine: Identifiable, Hashable, Codable {
     let id: String
     let name: String
     let searchUrl: String  // %s が検索語に置換
@@ -242,6 +242,11 @@ final class AppSettingsStore: ObservableObject {
     // ヘッダー
     @Published var showBookmarkButton: Bool { didSet { d.set(showBookmarkButton, forKey: "chm_h_bm") } }
     @Published var showChameleonBadge: Bool { didSet { d.set(showChameleonBadge, forKey: "chm_h_badge") } }
+    // 任意登録の検索エンジン
+    @Published var customEngines: [SearchEngine] { didSet { persistEngines() } }
+    // ホーム背景画像
+    @Published var useCustomBg: Bool { didSet { d.set(useCustomBg, forKey: "chm_bg_img") } }
+    @Published var bgVersion = 0   // 画像差し替え時に再描画を促す
 
     private let d = UserDefaults.standard
 
@@ -256,9 +261,41 @@ final class AppSettingsStore: ObservableObject {
         memo = d.string(forKey: "chm_memo") ?? ""
         showBookmarkButton = d.object(forKey: "chm_h_bm") as? Bool ?? true
         showChameleonBadge = d.object(forKey: "chm_h_badge") as? Bool ?? true
+        useCustomBg = d.object(forKey: "chm_bg_img") as? Bool ?? false
+        if let data = d.data(forKey: "chm_custom_engines"),
+           let v = try? JSONDecoder().decode([SearchEngine].self, from: data) { customEngines = v }
+        else { customEngines = [] }
     }
 
-    var engine: SearchEngine { DEFAULT_ENGINES.first { $0.id == engineId } ?? DEFAULT_ENGINES[0] }
+    private func persistEngines() {
+        if let data = try? JSONEncoder().encode(customEngines) { d.set(data, forKey: "chm_custom_engines") }
+    }
+
+    var allEngines: [SearchEngine] { DEFAULT_ENGINES + customEngines }
+    var engine: SearchEngine { allEngines.first { $0.id == engineId } ?? DEFAULT_ENGINES[0] }
+
+    func addEngine(name: String, searchUrl: String) {
+        let host = URL(string: searchUrl)?.host.map { "https://\($0)" } ?? searchUrl
+        customEngines.append(SearchEngine(id: "custom-\(UUID().uuidString)", name: name, searchUrl: searchUrl, homeUrl: host))
+    }
+    func removeEngine(_ id: String) {
+        customEngines.removeAll { $0.id == id }
+        if engineId == id { engineId = "google" }
+    }
+
+    // MARK: - 背景画像
+    var bgImageURL: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("chamaeleon-home-bg.jpg")
+    }
+    func setBgImage(_ data: Data) {
+        try? data.write(to: bgImageURL, options: .atomic)
+        useCustomBg = true; bgVersion += 1
+    }
+    func clearBgImage() {
+        try? FileManager.default.removeItem(at: bgImageURL)
+        useCustomBg = false; bgVersion += 1
+    }
 }
 
 // MARK: - 見た目プリセット（選択式編集）

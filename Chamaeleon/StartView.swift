@@ -20,8 +20,7 @@ struct StartView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(colors: [Color(hex: settings.bg.topHex), Color(hex: settings.bg.bottomHex)],
-                           startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            background.ignoresSafeArea()
             VStack(spacing: 18) {
                 Spacer().frame(height: 28)
                 Text(settings.greeting).font(.system(size: 28, weight: .heavy)).foregroundColor(.white)
@@ -34,7 +33,7 @@ struct StartView: View {
                 if settings.showEngineBar {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(DEFAULT_ENGINES) { e in
+                            ForEach(settings.allEngines) { e in
                                 Button { settings.engineId = e.id } label: {
                                     Text(e.name).font(.system(size: 13, weight: .semibold))
                                         .padding(.horizontal, 16).padding(.vertical, 8)
@@ -109,6 +108,23 @@ struct StartView: View {
                 }
                 Spacer(minLength: 0)
             }
+        }
+    }
+
+    // MARK: - 背景（グラデーション or 任意画像）
+
+    @ViewBuilder private var background: some View {
+        if settings.useCustomBg, let img = UIImage(contentsOfFile: settings.bgImageURL.path) {
+            ZStack {
+                Image(uiImage: img).resizable().scaledToFill()
+                // 文字を読みやすくする暗幕
+                LinearGradient(colors: [.black.opacity(0.35), .black.opacity(0.65)],
+                               startPoint: .top, endPoint: .bottom)
+            }
+            .id(settings.bgVersion)
+        } else {
+            LinearGradient(colors: [Color(hex: settings.bg.topHex), Color(hex: settings.bg.bottomHex)],
+                           startPoint: .top, endPoint: .bottom)
         }
     }
 
