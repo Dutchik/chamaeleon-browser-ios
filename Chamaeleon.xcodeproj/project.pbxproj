@@ -10,12 +10,12 @@
 		058CA10E4972F6F87EB123C7 /* Flows.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6CAEE319BD1915BE82F4880 /* Flows.swift */; };
 		085496E0265E938FA1D5996B /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 534865698659E829E6586B49 /* Models.swift */; };
 		08B5A099922BF433460C83FB /* AutomationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD2F935DF7A32E3804D4ECB /* AutomationViews.swift */; };
+		1767A28ED74EF4070C26AC5C /* InlineEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990A3786A5DA6ECF1C451A2B /* InlineEditors.swift */; };
 		4039E4108CAFAA9E1DD5F5C4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFF6B0836E900A30342E0501 /* ContentView.swift */; };
 		4417805D544535FA9509D33A /* ChamaeleonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F461DC464DB648E236420F /* ChamaeleonApp.swift */; };
 		9F60AFBE56472356BE1AC52B /* StartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEAF0272A211B254419A134C /* StartView.swift */; };
 		A20E7F615E12C9A69F5BC3CD /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDAA831A329E93EC2B1F7157 /* BrowserView.swift */; };
 		CA3D8516F5C38242E1458E2B /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E780023D128EA391150AC23E /* LibraryView.swift */; };
-		D6C69BC9C352680F0F392249 /* StyleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4E779787EDC79461BEECE22 /* StyleEditorView.swift */; };
 		EF8024589AEF48D973ACF5B4 /* SitePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */; };
 		FE4C7156642D3D3FA2EC2154 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6844D9CDAE8B6AEC266DFCBD /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -24,8 +24,8 @@
 		0801B4DA839C7757AA452DFA /* Chamaeleon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chamaeleon.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		534865698659E829E6586B49 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		6844D9CDAE8B6AEC266DFCBD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		990A3786A5DA6ECF1C451A2B /* InlineEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineEditors.swift; sourceTree = "<group>"; };
 		9DD2F935DF7A32E3804D4ECB /* AutomationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationViews.swift; sourceTree = "<group>"; };
-		A4E779787EDC79461BEECE22 /* StyleEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StyleEditorView.swift; sourceTree = "<group>"; };
 		A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePanelView.swift; sourceTree = "<group>"; };
 		B2F461DC464DB648E236420F /* ChamaeleonApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChamaeleonApp.swift; sourceTree = "<group>"; };
 		B6CAEE319BD1915BE82F4880 /* Flows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Flows.swift; sourceTree = "<group>"; };
@@ -45,11 +45,11 @@
 				B2F461DC464DB648E236420F /* ChamaeleonApp.swift */,
 				EFF6B0836E900A30342E0501 /* ContentView.swift */,
 				B6CAEE319BD1915BE82F4880 /* Flows.swift */,
+				990A3786A5DA6ECF1C451A2B /* InlineEditors.swift */,
 				E780023D128EA391150AC23E /* LibraryView.swift */,
 				534865698659E829E6586B49 /* Models.swift */,
 				A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */,
 				BEAF0272A211B254419A134C /* StartView.swift */,
-				A4E779787EDC79461BEECE22 /* StyleEditorView.swift */,
 			);
 			path = Chamaeleon;
 			sourceTree = "<group>";
@@ -145,11 +145,11 @@
 				4417805D544535FA9509D33A /* ChamaeleonApp.swift in Sources */,
 				4039E4108CAFAA9E1DD5F5C4 /* ContentView.swift in Sources */,
 				058CA10E4972F6F87EB123C7 /* Flows.swift in Sources */,
+				1767A28ED74EF4070C26AC5C /* InlineEditors.swift in Sources */,
 				CA3D8516F5C38242E1458E2B /* LibraryView.swift in Sources */,
 				085496E0265E938FA1D5996B /* Models.swift in Sources */,
 				EF8024589AEF48D973ACF5B4 /* SitePanelView.swift in Sources */,
 				9F60AFBE56472356BE1AC52B /* StartView.swift in Sources */,
-				D6C69BC9C352680F0F392249 /* StyleEditorView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -14,7 +14,8 @@ struct ContentView: View {
     @State private var showDrawer = false
     @State private var showFlows = false
     @State private var showCreds = false
-    @State private var showStyle = false
+    @State private var editor: InlineEditor = .none
+    @State private var wizardFlow: Flow?
     @State private var flowStatus: String?
     @FocusState private var urlFocused: Bool
 
@@ -40,17 +41,20 @@ struct ContentView: View {
                     library: library, settings: settings,
                     onFlows: { showDrawer = false; showFlows = true },
                     onCreds: { showDrawer = false; showCreds = true },
-                    onStyle: { showDrawer = false; showStyle = true },
+                    onStyle: { showDrawer = false; openEditor(.style) },
                     onSite: { showDrawer = false; showPanel = true },
                     onLibrary: { showDrawer = false; showLibrary = true },
-                    onRecord: { showDrawer = false; toggleRecord() },
+                    onRecord: { showDrawer = false; openEditor(.record) },
                     onHome: { showDrawer = false; active?.goHome() },
-                    isRecording: active?.recording ?? false
+                    isRecording: editor == .record
                 )
                 .frame(width: 290).frame(maxHeight: .infinity)
                 .background(Color(uiColor: .systemBackground))
                 .transition(.move(edge: .leading))
             }
+
+            // 画面下部の編集パネル（ページを見ながら設定）
+            inlineEditorPanel
         }
         .onAppear {
             if tabs.isEmpty { tabs = [BrowserModel(home: true)] }
@@ -59,7 +63,38 @@ struct ContentView: View {
         .sheet(isPresented: $showLibrary) { if let m = active { LibraryView(library: library, model: m) } }
         .sheet(isPresented: $showFlows) { if let m = active { FlowListView(flowStore: flowStore, credStore: credStore, model: m) } }
         .sheet(isPresented: $showCreds) { CredentialsView(store: credStore) }
-        .sheet(isPresented: $showStyle) { if let m = active { StyleEditorView(store: store, model: m) } }
+        .sheet(item: $wizardFlow) { f in
+            if let m = active { FlowWizardView(flowStore: flowStore, credStore: credStore, model: m, editing: f) }
+        }
+    }
+
+    // MARK: - インライン編集パネル
+
+    @ViewBuilder
+    private var inlineEditorPanel: some View {
+        if let model = active, editor != .none {
+            VStack {
+                Spacer()
+                switch editor {
+                case .style:
+                    InlineStylePanel(store: store, model: model) { editor = .none }
+                case .record:
+                    InlineRecordPanel(model: model, onClose: { editor = .none }) { flow in
+                        editor = .none
+                        wizardFlow = flow
+                    }
+                case .none:
+                    EmptyView()
+                }
+            }
+            .transition(.move(edge: .bottom))
+        }
+    }
+
+    private func openEditor(_ e: InlineEditor) {
+        // ホーム画面では編集対象のページが無いので開かない
+        if active?.isHome == true { return }
+        editor = e
     }
 
     // MARK: - コンテンツ（ホーム or WebView）
@@ -127,11 +162,6 @@ struct ContentView: View {
         }
     }
 
-    private func toggleRecord() {
-        guard let m = active else { return }
-        if m.recording { m.stopRecording() } else { m.startRecording() }
-    }
-
     // MARK: - タブバー
 
     private var tabBar: some View {
@@ -179,7 +209,7 @@ struct ContentView: View {
     private var navBar: some View {
         if let model = active {
             NavBarView(model: model, library: library,
-                       showPanel: $showPanel, showStyle: $showStyle,
+                       showPanel: $showPanel,
                        urlFocused: $urlFocused)
         }
     }
@@ -282,7 +312,6 @@ private struct NavBarView: View {
     @ObservedObject var model: BrowserModel
     @ObservedObject var library: LibraryStore
     @Binding var showPanel: Bool
-    @Binding var showStyle: Bool
     var urlFocused: FocusState<Bool>.Binding
 
     var body: some View {
