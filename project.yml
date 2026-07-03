@@ -26,6 +26,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.awokela.chamaeleon.ios
         PRODUCT_NAME: Chamaeleon
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_OBJC_BRIDGING_HEADER: Chamaeleon/Chamaeleon-Bridging-Header.h
         SUPPORTS_MACCATALYST: YES
         DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: YES
         MACOSX_DEPLOYMENT_TARGET: "13.0"

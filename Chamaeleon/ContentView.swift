@@ -18,6 +18,7 @@ struct ContentView: View {
     @StateObject private var credStore = CredentialStore()
     @StateObject private var settings = AppSettingsStore()
     @StateObject private var splitStore = SplitStore()
+    @StateObject private var netRules = NetRuleStore()
     @StateObject private var recordSession = RecordSession()
 
     @State private var tabs: [BrowserTab] = []
@@ -28,6 +29,7 @@ struct ContentView: View {
     @State private var showFlows = false
     @State private var showCreds = false
     @State private var showHomeSettings = false
+    @State private var showBlock = false
     @State private var editor: InlineEditor = .none      // 下部スタイル編集パネル
     @State private var dockExpanded = false              // 右ドックの展開状態
     @State private var wizardFlow: Flow?
@@ -70,6 +72,7 @@ struct ContentView: View {
                     onRecord: { showDrawer = false; toggleRecord() },
                     onSplit: { showDrawer = false; splitTab(.horizontal) },
                     onHomeSettings: { showDrawer = false; showHomeSettings = true },
+                    onBlock: { showDrawer = false; showBlock = true },
                     onHome: { showDrawer = false; active?.goHome() },
                     isRecording: recordSession.active
                 )
@@ -112,6 +115,7 @@ struct ContentView: View {
         .sheet(isPresented: $showLibrary) { if let m = active { LibraryView(library: library, model: m) } }
         .sheet(isPresented: $showFlows) { if let m = active { FlowListView(flowStore: flowStore, credStore: credStore, model: m) } }
         .sheet(isPresented: $showCreds) { CredentialsView(store: credStore) }
+        .sheet(isPresented: $showBlock) { if let m = active { BlockRulesView(netRules: netRules, model: m, accent: accent) } }
         .sheet(item: $wizardFlow) { f in
             if let m = active { FlowWizardView(flowStore: flowStore, credStore: credStore, model: m, editing: f) }
         }
@@ -141,7 +145,7 @@ struct ContentView: View {
         ZStack {
             ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
                 TabPanesView(tab: tab, store: store, library: library, settings: settings,
-                             flowStore: flowStore, splitStore: splitStore, accent: accent,
+                             flowStore: flowStore, splitStore: splitStore, netRules: netRules, accent: accent,
                              onRunFlow: { flow, model in runFlow(flow, model: model) },
                              onOpenSplit: { cfg in openSplit(cfg) },
                              onNewSplit: { splitTab(.horizontal) })
@@ -319,6 +323,7 @@ private struct TabPanesView: View {
     @ObservedObject var settings: AppSettingsStore
     @ObservedObject var flowStore: FlowStore
     @ObservedObject var splitStore: SplitStore
+    @ObservedObject var netRules: NetRuleStore
     let accent: Color
     let onRunFlow: (Flow, BrowserModel) -> Void
     let onOpenSplit: (SplitConfig) -> Void
@@ -348,7 +353,7 @@ private struct TabPanesView: View {
                               onSelect: { tab.activePane = i }, onClose: { closePane(i) })
                 }
                 ZStack {
-                    BrowserView(model: model, store: store) { url, title in library.recordVisit(url: url, title: title) }
+                    BrowserView(model: model, store: store, netRules: netRules) { url, title in library.recordVisit(url: url, title: title) }
                     if model.isHome {
                         StartView(settings: settings, library: library, flowStore: flowStore, splitStore: splitStore,
                                   onSearch: { model.navigate($0); tab.activePane = i },
@@ -407,6 +412,7 @@ private struct DrawerView: View {
     let onRecord: () -> Void
     let onSplit: () -> Void
     let onHomeSettings: () -> Void
+    let onBlock: () -> Void
     let onHome: () -> Void
     let isRecording: Bool
 
@@ -433,6 +439,9 @@ private struct DrawerView: View {
                         row("paintbrush.pointed", "スタイル編集", onStyle)
                         row("slider.horizontal.3", "サイト設定", onSite)
                         row("paintpalette", "ホーム / 見た目の編集", onHomeSettings)
+                    }
+                    category("保護 / ブロック", "shield.lefthalf.filled") {
+                        row("shield.lefthalf.filled", "広告ブロック・リクエスト制御", onBlock)
                     }
                     category("検索エンジン", "magnifyingglass") {
                         ForEach(settings.allEngines) { e in

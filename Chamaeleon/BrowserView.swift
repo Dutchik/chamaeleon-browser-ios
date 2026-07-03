@@ -18,15 +18,18 @@ struct InspectedInfo: Equatable {
 struct BrowserView: UIViewRepresentable {
     @ObservedObject var model: BrowserModel
     @ObservedObject var store: ProfileStore
+    @ObservedObject var netRules: NetRuleStore
     var onVisit: ((String, String) -> Void)? = nil
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         config.userContentController.add(context.coordinator, name: "chm")
+        if let list = netRules.compiledList { config.userContentController.add(list) }
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
+        context.coordinator.appliedRuleVersion = netRules.version
         model.webView = webView
         if let url = URL(string: model.urlString) {
             webView.load(URLRequest(url: url))
@@ -34,15 +37,34 @@ struct BrowserView: UIViewRepresentable {
         return webView
     }
 
-    func updateUIView(_ webView: WKWebView, context: Context) {}
-    func makeCoordinator() -> Coordinator { Coordinator(model: model, store: store, onVisit: onVisit) }
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        if context.coordinator.appliedRuleVersion != netRules.version {
+            context.coordinator.appliedRuleVersion = netRules.version
+            let ucc = webView.configuration.userContentController
+            ucc.removeAllContentRuleLists()
+            if let list = netRules.compiledList { ucc.add(list) }
+        }
+    }
+    func makeCoordinator() -> Coordinator { Coordinator(model: model, store: store, netRules: netRules, onVisit: onVisit) }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         let model: BrowserModel
         let store: ProfileStore
+        let netRules: NetRuleStore
         let onVisit: ((String, String) -> Void)?
-        init(model: BrowserModel, store: ProfileStore, onVisit: ((String, String) -> Void)?) {
-            self.model = model; self.store = store; self.onVisit = onVisit
+        var appliedRuleVersion = -1
+        init(model: BrowserModel, store: ProfileStore, netRules: NetRuleStore, onVisit: ((String, String) -> Void)?) {
+            self.model = model; self.store = store; self.netRules = netRules; self.onVisit = onVisit
+        }
+
+        // メインフレームのナビゲーションを C エンジンで判定してブロック
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            if netRules.masterEnabled, navigationAction.targetFrame?.isMainFrame ?? true,
+               let u = navigationAction.request.url?.absoluteString, chm_rules_eval(u) == 1 {
+                decisionHandler(.cancel); return
+            }
+            decisionHandler(.allow)
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
@@ -157,8 +179,9 @@ final class BrowserModel: ObservableObject, Identifiable {
 
     func startInspect() { webView?.evaluateJavaScript(BrowserJS.inspect) }
     func previewCss(_ css: String) {
-        let esc = css.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "`", with: "\\`")
-        webView?.evaluateJavaScript("(function(){var e=document.getElementById('chm-style-preview');if(!e){e=document.createElement('style');e.id='chm-style-preview';document.documentElement.appendChild(e);}e.textContent=`\(esc)`;})();")
+        let b64 = Data(css.utf8).base64EncodedString()
+        let decode = "new TextDecoder().decode(Uint8Array.from(atob('\(b64)'),function(c){return c.charCodeAt(0)}))"
+        webView?.evaluateJavaScript("(function(){var e=document.getElementById('chm-style-preview');if(!e){e=document.createElement('style');e.id='chm-style-preview';document.documentElement.appendChild(e);}e.textContent=\(decode);})();")
     }
     func clearPreview() { webView?.evaluateJavaScript("document.getElementById('chm-style-preview')?.remove();") }
 
@@ -196,17 +219,10 @@ enum PatchEngine {
     }
 
     private static func inject(css: CssPatch, to webView: WKWebView) {
-        let escaped = css.code
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "`", with: "\\`")
-        let js = """
-        (function(){
-          var s = document.createElement('style');
-          s.dataset.chamaeleon = '\(css.id)';
-          s.textContent = `\(escaped)`;
-          (document.head || document.documentElement).appendChild(s);
-        })();
-        """
+        // Base64経由で注入（バッククォート/バックスラッシュ/${}等のエスケープ不具合を回避）
+        let b64 = Data(css.code.utf8).base64EncodedString()
+        let decode = "new TextDecoder().decode(Uint8Array.from(atob('\(b64)'),function(c){return c.charCodeAt(0)}))"
+        let js = "(function(){var s=document.createElement('style');s.dataset.chamaeleon='\(css.id)';s.textContent=\(decode);(document.head||document.documentElement).appendChild(s);})();"
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
@@ -314,7 +330,7 @@ enum BrowserJS {
       if(type==='runJavaScript'){new Function(value)();return;}
       var el=await waitFor(selector,timeoutMs||12000);
       if(type==='click'){el.scrollIntoView({block:'center'});el.click();}
-      else if(type==='input'){el.focus();el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}
+      else if(type==='input'){el.focus();var proto=el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;var d=Object.getOwnPropertyDescriptor(proto,'value');if(d&&d.set){d.set.call(el,value);}else{el.value=value;}el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}
       else if(type==='check'||type==='uncheck'){var w=type==='check';if(el.checked!==w)el.click();}
       else if(type==='select'){el.value=value;el.dispatchEvent(new Event('change',{bubbles:true}));}
       else if(type==='submit'){var f=el.tagName==='FORM'?el:el.closest('form');if(f)f.requestSubmit?f.requestSubmit():f.submit();}
