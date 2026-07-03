@@ -226,10 +226,62 @@ final class CredentialStore: ObservableObject {
     }
 }
 
-/// アプリ設定（検索エンジン等）
+/// アプリ設定（検索エンジン＋ホーム/ヘッダーの見た目カスタマイズ）
 @MainActor
 final class AppSettingsStore: ObservableObject {
-    @Published var engineId: String { didSet { UserDefaults.standard.set(engineId, forKey: "chm_engine") } }
-    init() { engineId = UserDefaults.standard.string(forKey: "chm_engine") ?? "google" }
+    @Published var engineId: String { didSet { d.set(engineId, forKey: "chm_engine") } }
+    // 見た目（選択式で編集）
+    @Published var accentId: String { didSet { d.set(accentId, forKey: "chm_accent") } }
+    @Published var bgId: String { didSet { d.set(bgId, forKey: "chm_bg") } }
+    @Published var greeting: String { didSet { d.set(greeting, forKey: "chm_greeting") } }
+    // ウィジェット
+    @Published var showEngineBar: Bool { didSet { d.set(showEngineBar, forKey: "chm_w_engine") } }
+    @Published var showClock: Bool { didSet { d.set(showClock, forKey: "chm_w_clock") } }
+    @Published var showMemo: Bool { didSet { d.set(showMemo, forKey: "chm_w_memo") } }
+    @Published var memo: String { didSet { d.set(memo, forKey: "chm_memo") } }
+    // ヘッダー
+    @Published var showBookmarkButton: Bool { didSet { d.set(showBookmarkButton, forKey: "chm_h_bm") } }
+    @Published var showChameleonBadge: Bool { didSet { d.set(showChameleonBadge, forKey: "chm_h_badge") } }
+
+    private let d = UserDefaults.standard
+
+    init() {
+        engineId = d.string(forKey: "chm_engine") ?? "google"
+        accentId = d.string(forKey: "chm_accent") ?? "green"
+        bgId = d.string(forKey: "chm_bg") ?? "forest"
+        greeting = d.string(forKey: "chm_greeting") ?? "🦎 Chamaeleon"
+        showEngineBar = d.object(forKey: "chm_w_engine") as? Bool ?? true
+        showClock = d.object(forKey: "chm_w_clock") as? Bool ?? false
+        showMemo = d.object(forKey: "chm_w_memo") as? Bool ?? false
+        memo = d.string(forKey: "chm_memo") ?? ""
+        showBookmarkButton = d.object(forKey: "chm_h_bm") as? Bool ?? true
+        showChameleonBadge = d.object(forKey: "chm_h_badge") as? Bool ?? true
+    }
+
     var engine: SearchEngine { DEFAULT_ENGINES.first { $0.id == engineId } ?? DEFAULT_ENGINES[0] }
+}
+
+// MARK: - 見た目プリセット（選択式編集）
+
+struct AccentOption: Identifiable { let id: String; let name: String; let hex: String }
+let ACCENT_OPTIONS: [AccentOption] = [
+    .init(id: "green", name: "グリーン", hex: "#22C55E"),
+    .init(id: "teal", name: "ティール", hex: "#14B8A6"),
+    .init(id: "blue", name: "ブルー", hex: "#3B82F6"),
+    .init(id: "purple", name: "パープル", hex: "#8B5CF6"),
+    .init(id: "orange", name: "オレンジ", hex: "#F97316"),
+    .init(id: "pink", name: "ピンク", hex: "#EC4899"),
+]
+
+struct BgOption: Identifiable { let id: String; let name: String; let topHex: String; let bottomHex: String }
+let BG_OPTIONS: [BgOption] = [
+    .init(id: "forest", name: "フォレスト", topHex: "#0F1712", bottomHex: "#000000"),
+    .init(id: "midnight", name: "ミッドナイト", topHex: "#0B1220", bottomHex: "#000000"),
+    .init(id: "slate", name: "スレート", topHex: "#1E293B", bottomHex: "#0A0F1A"),
+    .init(id: "plum", name: "プラム", topHex: "#1E1233", bottomHex: "#000000"),
+]
+
+extension AppSettingsStore {
+    var accentHex: String { ACCENT_OPTIONS.first { $0.id == accentId }?.hex ?? "#22C55E" }
+    var bg: BgOption { BG_OPTIONS.first { $0.id == bgId } ?? BG_OPTIONS[0] }
 }

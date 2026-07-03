@@ -6,6 +6,7 @@ struct ContentView: View {
     @StateObject private var flowStore = FlowStore()
     @StateObject private var credStore = CredentialStore()
     @StateObject private var settings = AppSettingsStore()
+    @StateObject private var splitStore = SplitStore()
 
     @State private var tabs: [BrowserModel] = []
     @State private var activeIndex = 0
@@ -14,11 +15,15 @@ struct ContentView: View {
     @State private var showDrawer = false
     @State private var showFlows = false
     @State private var showCreds = false
+    @State private var showHomeSettings = false
     @State private var editor: InlineEditor = .none
     @State private var wizardFlow: Flow?
     @State private var runInputFlow: Flow?
+    @State private var activeSplit: SplitConfig?
     @State private var flowStatus: String?
     @FocusState private var urlFocused: Bool
+
+    private var accent: Color { Color(hex: settings.accentHex) }
 
     private var active: BrowserModel? {
         tabs.indices.contains(activeIndex) ? tabs[activeIndex] : tabs.first
@@ -46,6 +51,8 @@ struct ContentView: View {
                     onSite: { showDrawer = false; showPanel = true },
                     onLibrary: { showDrawer = false; showLibrary = true },
                     onRecord: { showDrawer = false; openEditor(.record) },
+                    onSplit: { showDrawer = false; activeSplit = SplitConfig() },
+                    onHomeSettings: { showDrawer = false; showHomeSettings = true },
                     onHome: { showDrawer = false; active?.goHome() },
                     isRecording: editor == .record
                 )
@@ -57,9 +64,16 @@ struct ContentView: View {
             // 画面下部の編集パネル（ページを見ながら設定）
             inlineEditorPanel
         }
+        .tint(accent)
         .onAppear {
             if tabs.isEmpty { tabs = [BrowserModel(home: true)] }
         }
+        .fullScreenCover(item: $activeSplit) { cfg in
+            SplitContainerView(store: store, splitStore: splitStore, config: cfg, accent: accent) {
+                activeSplit = nil
+            }
+        }
+        .sheet(isPresented: $showHomeSettings) { HomeSettingsView(settings: settings) }
         .sheet(isPresented: $showPanel) {
             if let m = active {
                 SitePanelView(store: store, model: m, flowStore: flowStore, credStore: credStore) { flow in
@@ -120,9 +134,11 @@ struct ContentView: View {
                         library.recordVisit(url: url, title: title)
                     }
                     if model.isHome {
-                        StartView(settings: settings, library: library, flowStore: flowStore,
+                        StartView(settings: settings, library: library, flowStore: flowStore, splitStore: splitStore,
                                   onSearch: { target in model.navigate(target) },
-                                  onRunFlow: { flow in runFlow(flow, model: model) })
+                                  onRunFlow: { flow in runFlow(flow, model: model) },
+                                  onOpenSplit: { cfg in activeSplit = cfg },
+                                  onNewSplit: { activeSplit = SplitConfig() })
                     }
                 }
                 .opacity(index == activeIndex ? 1 : 0)
@@ -231,7 +247,7 @@ struct ContentView: View {
     @ViewBuilder
     private var navBar: some View {
         if let model = active {
-            NavBarView(model: model, library: library,
+            NavBarView(model: model, library: library, settings: settings,
                        showPanel: $showPanel,
                        urlFocused: $urlFocused)
         }
@@ -248,6 +264,8 @@ private struct DrawerView: View {
     let onSite: () -> Void
     let onLibrary: () -> Void
     let onRecord: () -> Void
+    let onSplit: () -> Void
+    let onHomeSettings: () -> Void
     let onHome: () -> Void
     let isRecording: Bool
 
@@ -262,12 +280,14 @@ private struct DrawerView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     row("house", "ホーム", onHome)
+                    row("rectangle.split.2x2", "分割ビュー（複数サイト）", onSplit)
                     row("wand.and.stars", "自動化フロー", onFlows)
                     row(isRecording ? "record.circle.fill" : "record.circle",
                         isRecording ? "記録を停止" : "操作を記録", onRecord, tint: isRecording ? .red : nil)
                     row("key.fill", "認証情報（端末内）", onCreds)
                     row("paintbrush.pointed", "スタイル編集", onStyle)
                     row("slider.horizontal.3", "サイト設定", onSite)
+                    row("paintpalette", "ホーム / 見た目の編集", onHomeSettings)
                     row("books.vertical", "ブックマーク・履歴", onLibrary)
                     Divider().padding(.vertical, 8)
                     Text("検索エンジン").font(.system(size: 12, weight: .semibold))
@@ -334,6 +354,7 @@ private struct TabChip: View {
 private struct NavBarView: View {
     @ObservedObject var model: BrowserModel
     @ObservedObject var library: LibraryStore
+    @ObservedObject var settings: AppSettingsStore
     @Binding var showPanel: Bool
     var urlFocused: FocusState<Bool>.Binding
 
@@ -363,20 +384,24 @@ private struct NavBarView: View {
                 Button { model.webView?.reload() } label: { Image(systemName: "arrow.clockwise") }
             }
 
-            Button {
-                library.toggleBookmark(url: model.currentURL, title: model.title)
-            } label: {
-                Image(systemName: library.isBookmarked(model.currentURL) ? "star.fill" : "star")
-                    .foregroundColor(library.isBookmarked(model.currentURL) ? .yellow : .accentColor)
+            if settings.showBookmarkButton {
+                Button {
+                    library.toggleBookmark(url: model.currentURL, title: model.title)
+                } label: {
+                    Image(systemName: library.isBookmarked(model.currentURL) ? "star.fill" : "star")
+                        .foregroundColor(library.isBookmarked(model.currentURL) ? .yellow : .accentColor)
+                }
             }
 
             // カメレオンバッジ: 適用中プロファイル数 → Site Panel
-            Button { showPanel = true } label: {
-                HStack(spacing: 3) {
-                    Text("🦎")
-                    Text("\(model.matchedCount)")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(model.matchedCount > 0 ? .green : .secondary)
+            if settings.showChameleonBadge {
+                Button { showPanel = true } label: {
+                    HStack(spacing: 3) {
+                        Text("🦎")
+                        Text("\(model.matchedCount)")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(model.matchedCount > 0 ? Color(hex: settings.accentHex) : .secondary)
+                    }
                 }
             }
         }
