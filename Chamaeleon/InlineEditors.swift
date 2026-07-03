@@ -62,10 +62,13 @@ struct StyleEditorBody: View {
                 // かんたん編集（CSS不要）
                 Text("かんたん編集（CSS不要）").font(.system(size: 12, weight: .semibold)).foregroundColor(.secondary)
                 VStack(spacing: 8) {
-                    ColorPicker("文字色", selection: $textColor, supportsOpacity: false)
-                        .onChange(of: textColor) { c in setEdit("color", hex(c)) }
-                    ColorPicker("背景色", selection: $bgColor, supportsOpacity: false)
+                    // ワンタップの色見本（CSS/カラーピッカー不要）
+                    swatchRow("背景色", "background-color")
+                    swatchRow("文字色", "color")
+                    ColorPicker("背景色（詳細）", selection: $bgColor, supportsOpacity: false)
                         .onChange(of: bgColor) { c in setEdit("background-color", hex(c)) }
+                    ColorPicker("文字色（詳細）", selection: $textColor, supportsOpacity: false)
+                        .onChange(of: textColor) { c in setEdit("color", hex(c)) }
                     HStack(spacing: 8) {
                         Text("文字").font(.system(size: 13))
                         Button { bumpFont(-2) } label: { Image(systemName: "textformat.size.smaller") }.buttonStyle(.bordered)
@@ -134,6 +137,24 @@ struct StyleEditorBody: View {
         if css.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { css = "\(s) {\n  \n}" }
         else if !css.contains(s) { css = "\(s) {\n  \n}\n" + css }
         model.previewCss(css)
+    }
+
+    // MARK: - ワンタップ色見本
+    private let swatchColors: [String] = ["#FFFFFF", "#000000", "#E53935", "#1E88E5", "#43A047", "#FDD835", "#9E9E9E"]
+    private func swatchRow(_ label: String, _ prop: String) -> some View {
+        HStack(spacing: 6) {
+            Text(label).font(.system(size: 12)).frame(width: 46, alignment: .leading)
+            ForEach(swatchColors, id: \.self) { hexc in
+                Button { setEdit(prop, hexc) } label: {
+                    Circle().fill(Color(hex: hexc)).frame(width: 22, height: 22)
+                        .overlay(Circle().stroke(Color.primary.opacity(0.2)))
+                }.buttonStyle(.plain)
+            }
+            Button { removeEdit(prop) } label: {
+                Image(systemName: "slash.circle").font(.system(size: 17)).foregroundColor(.secondary)
+            }.buttonStyle(.plain)
+            Spacer()
+        }
     }
 
     // MARK: - かんたん編集ヘルパ

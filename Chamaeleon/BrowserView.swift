@@ -71,11 +71,52 @@ struct BrowserView: UIViewRepresentable {
             self.model = model; self.store = store; self.netRules = netRules; self.onVisit = onVisit
         }
 
-        // target=_blank / window.open で開こうとしたURLを同じWebViewで開く（白画面/リンク無反応の修正）
+        // target=_blank / window.open を同じWebViewで開く（白画面/リンク無反応の修正）
+        // URLが即座に無い(window.open('')後にlocation設定)場合は一時WebViewで受けてメインへ転送
+        var popups: [PopupRedirector] = []
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                      for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            if let url = navigationAction.request.url { webView.load(URLRequest(url: url)) }
-            return nil
+            if let url = navigationAction.request.url, !url.absoluteString.isEmpty {
+                webView.load(URLRequest(url: url)); return nil
+            }
+            let redirector = PopupRedirector(main: webView) { [weak self] r in
+                self?.popups.removeAll { $0 === r }
+            }
+            let popup = WKWebView(frame: .zero, configuration: configuration)
+            popup.navigationDelegate = redirector
+            redirector.popup = popup
+            popups.append(redirector)
+            return popup
+        }
+
+        // JSダイアログ: フロー実行中は自動応答して停止を防ぐ。手動時はネイティブ表示。
+        func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
+                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+            if model.flowRunning { completionHandler(); return }
+            guard let vc = webView.chmTopVC else { completionHandler(); return }
+            let a = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            a.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
+            vc.present(a, animated: true)
+        }
+        func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+            if model.flowRunning { completionHandler(true); return }
+            guard let vc = webView.chmTopVC else { completionHandler(false); return }
+            let a = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            a.addAction(UIAlertAction(title: "キャンセル", style: .cancel) { _ in completionHandler(false) })
+            a.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler(true) })
+            vc.present(a, animated: true)
+        }
+        func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String,
+                     defaultText: String?, initiatedByFrame frame: WKFrameInfo,
+                     completionHandler: @escaping (String?) -> Void) {
+            if model.flowRunning { completionHandler(defaultText); return }
+            guard let vc = webView.chmTopVC else { completionHandler(defaultText); return }
+            let a = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
+            a.addTextField { $0.text = defaultText }
+            a.addAction(UIAlertAction(title: "キャンセル", style: .cancel) { _ in completionHandler(nil) })
+            a.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler(a.textFields?.first?.text) })
+            vc.present(a, animated: true)
         }
 
         // メインフレームのナビゲーションを C エンジンで判定してブロック（http(s)のみ対象）
@@ -152,6 +193,7 @@ final class BrowserModel: ObservableObject, Identifiable {
     @Published var matchedCount = 0
     @Published var recording = false
     @Published var isHome: Bool
+    var flowRunning = false      // フロー実行中はJSダイアログを自動応答（停止防止）
     weak var webView: WKWebView?
 
     var onRecorded: ((RecordedStep) -> Void)?
@@ -380,4 +422,33 @@ enum BrowserJS {
       else if(type==='waitForSelector'){/* 既に待機済み */}
     })();
     """
+}
+
+/// window.open('')後にlocationが設定されるポップアップを受けてメインWebViewへ転送
+final class PopupRedirector: NSObject, WKNavigationDelegate {
+    weak var main: WKWebView?
+    var popup: WKWebView?
+    private let onDone: (PopupRedirector) -> Void
+    init(main: WKWebView, onDone: @escaping (PopupRedirector) -> Void) { self.main = main; self.onDone = onDone }
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if let url = navigationAction.request.url, !url.absoluteString.isEmpty, url.absoluteString != "about:blank" {
+            main?.load(URLRequest(url: url))
+            decisionHandler(.cancel)
+            popup = nil
+            onDone(self)
+        } else {
+            decisionHandler(.allow)
+        }
+    }
+}
+
+extension WKWebView {
+    /// 現在表示中の最前面 ViewController（ダイアログ表示用）
+    var chmTopVC: UIViewController? {
+        var vc = window?.rootViewController
+        while let p = vc?.presentedViewController { vc = p }
+        return vc
+    }
 }

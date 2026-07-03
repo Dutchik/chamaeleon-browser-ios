@@ -9,8 +9,11 @@ enum FlowRunner {
                     inputs: [String: String] = [:],
                     status: @escaping (String) -> Void) async {
         status("▶ \(flow.name) を実行中…")
+        model.flowRunning = true                          // JSダイアログを自動応答して停止を防ぐ
+        defer { model.flowRunning = false }
         var cred: (username: String, password: String)?
         if flow.useCredentials, let cid = flow.credentialId { cred = creds.reveal(cid) }
+        let baseDelay = UInt64(max(0, flow.stepDelayMs)) * 1_000_000
 
         if !flow.startUrl.isEmpty, flow.startUrl != model.currentURL {
             await model.navigateAndWait(model.normalize(flow.startUrl))
@@ -22,6 +25,8 @@ enum FlowRunner {
                 try? await Task.sleep(nanoseconds: 400_000_000)
                 continue
             }
+            // 遅延実行: フロー全体の待機 + そのステップ固有の待機（ポップアップ描画待ち等）
+            if baseDelay > 0 { try? await Task.sleep(nanoseconds: baseDelay) }
             if step.delayMs > 0 { try? await Task.sleep(nanoseconds: UInt64(step.delayMs) * 1_000_000) }
             var type = step.type.rawValue
             var value = step.value
@@ -218,6 +223,12 @@ struct FlowWizardView: View {
                         Text("⚠ 認証情報は端末内のKeychainにのみ保存され、外部送信されません。")
                             .font(.system(size: 11)).foregroundColor(.orange)
                     }
+                }
+
+                Section {
+                    Stepper("各操作の前に待つ: \(flow.stepDelayMs) ms", value: $flow.stepDelayMs, in: 0...5000, step: 100)
+                    Text("ポップアップや画面遷移が間に合わず失敗する場合は、待機を長くしてください（遅延実行）。")
+                        .font(.system(size: 11)).foregroundColor(.secondary)
                 }
 
                 Section {

@@ -87,6 +87,7 @@ struct Flow: Codable, Identifiable, Equatable {
     var useCredentials = false
     var credentialId: String?
     var pinnedToHome = false
+    var stepDelayMs = 400        // 各操作の前の待機（ポップアップ描画待ち等。遅延実行）
     var steps: [FlowStep] = []
     var createdAt = ISO8601DateFormatter().string(from: Date())
     var updatedAt = ISO8601DateFormatter().string(from: Date())
@@ -105,7 +106,7 @@ struct Flow: Codable, Identifiable, Equatable {
     // 旧バージョンで保存したフロー（note等が無い）も読めるよう寛容にデコード
     enum CodingKeys: String, CodingKey {
         case id, name, note, enabled, matchType, matchPattern, startUrl
-        case useCredentials, credentialId, pinnedToHome, steps, createdAt, updatedAt
+        case useCredentials, credentialId, pinnedToHome, stepDelayMs, steps, createdAt, updatedAt
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -119,6 +120,7 @@ struct Flow: Codable, Identifiable, Equatable {
         useCredentials = try c.decodeIfPresent(Bool.self, forKey: .useCredentials) ?? false
         credentialId = try c.decodeIfPresent(String.self, forKey: .credentialId)
         pinnedToHome = try c.decodeIfPresent(Bool.self, forKey: .pinnedToHome) ?? false
+        stepDelayMs = try c.decodeIfPresent(Int.self, forKey: .stepDelayMs) ?? 400
         steps = try c.decodeIfPresent([FlowStep].self, forKey: .steps) ?? []
         createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt) ?? ISO8601DateFormatter().string(from: Date())
         updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt) ?? ISO8601DateFormatter().string(from: Date())
