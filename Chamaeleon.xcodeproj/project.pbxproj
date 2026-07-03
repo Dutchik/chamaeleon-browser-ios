@@ -13,11 +13,13 @@
 		A20E7F615E12C9A69F5BC3CD /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDAA831A329E93EC2B1F7157 /* BrowserView.swift */; };
 		CA3D8516F5C38242E1458E2B /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E780023D128EA391150AC23E /* LibraryView.swift */; };
 		EF8024589AEF48D973ACF5B4 /* SitePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */; };
+		FE4C7156642D3D3FA2EC2154 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6844D9CDAE8B6AEC266DFCBD /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0801B4DA839C7757AA452DFA /* Chamaeleon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chamaeleon.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		534865698659E829E6586B49 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		6844D9CDAE8B6AEC266DFCBD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePanelView.swift; sourceTree = "<group>"; };
 		B2F461DC464DB648E236420F /* ChamaeleonApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChamaeleonApp.swift; sourceTree = "<group>"; };
 		DDAA831A329E93EC2B1F7157 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
@@ -29,6 +31,7 @@
 		61AA098F66518A615FD336B9 /* Chamaeleon */ = {
 			isa = PBXGroup;
 			children = (
+				6844D9CDAE8B6AEC266DFCBD /* Assets.xcassets */,
 				DDAA831A329E93EC2B1F7157 /* BrowserView.swift */,
 				B2F461DC464DB648E236420F /* ChamaeleonApp.swift */,
 				EFF6B0836E900A30342E0501 /* ContentView.swift */,
@@ -63,6 +66,7 @@
 			buildConfigurationList = F14B8576C9A14481A65E9576 /* Build configuration list for PBXNativeTarget "Chamaeleon" */;
 			buildPhases = (
 				1DFB882B46D46F2FA16D43DF /* Sources */,
+				394E75C0CDF2A84618F9E2A7 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -107,6 +111,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		394E75C0CDF2A84618F9E2A7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FE4C7156642D3D3FA2EC2154 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		1DFB882B46D46F2FA16D43DF /* Sources */ = {
