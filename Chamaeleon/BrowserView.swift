@@ -29,6 +29,7 @@ struct BrowserView: UIViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
+        if #available(iOS 16.0, *) { webView.isFindInteractionEnabled = true }
         context.coordinator.appliedRuleVersion = netRules.version
         model.webView = webView
         if let url = URL(string: model.urlString) {
@@ -152,6 +153,9 @@ final class BrowserModel: ObservableObject, Identifiable {
         webView?.load(URLRequest(url: url))
     }
     func goHome() { isHome = true; currentURL = "chamaeleon://start"; urlInput = "" }
+    func findOnPage() {
+        if #available(iOS 16.0, *) { webView?.findInteraction?.presentFindNavigator(showingReplace: false) }
+    }
     func normalize(_ raw: String) -> String {
         let t = raw.trimmingCharacters(in: .whitespaces)
         if t.hasPrefix("http://") || t.hasPrefix("https://") { return t }
@@ -294,28 +298,45 @@ enum BrowserJS {
     })();
     """
 
-    // インスペクタ: ホバー＋クリックで要素選択、現在スタイルを返す
+    // インスペクタ: タッチ(ドラッグで狙って離して選択)＋マウス(Catalyst/desktop)対応。
+    // elementFromPoint で指の下の要素を特定するのでタッチ端末でも正確に選べる。
     static let inspect = """
     (function(){
       if(window.__chmInspecting)return; window.__chmInspecting=true;
       var ov=document.createElement('div');
-      ov.style.cssText='position:fixed;z-index:2147483647;pointer-events:none;border:2px solid #2a7de1;background:rgba(42,125,225,.12);border-radius:3px';
-      document.body.appendChild(ov);
+      ov.style.cssText='position:fixed;z-index:2147483647;pointer-events:none;border:2px solid #2a7de1;background:rgba(42,125,225,.14);border-radius:3px;transition:all .03s';
+      document.documentElement.appendChild(ov);
+      var tip=document.createElement('div');
+      tip.textContent='要素をタップ/ドラッグして選択';
+      tip.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483647;pointer-events:none;background:#2a7de1;color:#fff;font:600 12px -apple-system,sans-serif;padding:6px 12px;border-radius:999px';
+      document.documentElement.appendChild(tip);
       var PROPS=['color','background-color','font-size','font-weight','display','opacity','width','height','max-width','margin','padding','border','border-radius','text-align','box-shadow'];
-      function sel(el){ if(el.id)return '#'+CSS.escape(el.id);
-        var t=el.getAttribute('data-testid'); if(t)return '[data-testid=\\"'+t+'\\"]';
+      function sel(el){ if(!el)return ''; if(el.id)return '#'+CSS.escape(el.id);
+        var t=el.getAttribute&&el.getAttribute('data-testid'); if(t)return '[data-testid=\\"'+t+'\\"]';
         var parts=[],cur=el;
-        while(cur&&cur!==document.body&&parts.length<4){var p=cur.tagName.toLowerCase();var pe=cur.parentElement;
+        while(cur&&cur!==document.body&&cur.nodeType===1&&parts.length<4){var p=cur.tagName.toLowerCase();var pe=cur.parentElement;
           if(pe){var same=[].slice.call(pe.children).filter(function(c){return c.tagName===cur.tagName;});
           if(same.length>1)p+=':nth-of-type('+(same.indexOf(cur)+1)+')';}parts.unshift(p);cur=pe;}
         return parts.join(' > ');}
-      function move(e){var r=e.target.getBoundingClientRect();ov.style.left=r.left+'px';ov.style.top=r.top+'px';ov.style.width=r.width+'px';ov.style.height=r.height+'px';}
-      function click(e){e.preventDefault();e.stopPropagation();var el=e.target;var cs=getComputedStyle(el);var st={};
+      function at(x,y){return document.elementFromPoint(x,y);}   // ovは pointer-events:none なので下の要素が返る
+      function highlight(el){ if(!el||el===ov||el===tip)return; var r=el.getBoundingClientRect();
+        ov.style.left=r.left+'px';ov.style.top=r.top+'px';ov.style.width=r.width+'px';ov.style.height=r.height+'px'; }
+      function pick(el){ if(!el||el===ov||el===tip)return; var cs=getComputedStyle(el);var st={};
         PROPS.forEach(function(p){st[p]=cs.getPropertyValue(p).trim();});
         window.webkit.messageHandlers.chm.postMessage({kind:'inspected',selector:sel(el),styles:st});cleanup();}
-      function cleanup(){window.__chmInspecting=false;document.removeEventListener('mousemove',move,true);document.removeEventListener('click',click,true);ov.remove();}
-      document.addEventListener('mousemove',move,true);
-      document.addEventListener('click',click,true);
+      function onTouch(e){var t=e.touches&&e.touches[0];if(t){highlight(at(t.clientX,t.clientY));}if(e.cancelable)e.preventDefault();}
+      function onEnd(e){if(e.cancelable)e.preventDefault();e.stopPropagation();var t=e.changedTouches&&e.changedTouches[0];if(t){pick(at(t.clientX,t.clientY));}}
+      function onMouse(e){highlight(at(e.clientX,e.clientY));}
+      function onClick(e){e.preventDefault();e.stopPropagation();pick(at(e.clientX,e.clientY)||e.target);}
+      function cleanup(){window.__chmInspecting=false;
+        document.removeEventListener('touchstart',onTouch,true);document.removeEventListener('touchmove',onTouch,true);
+        document.removeEventListener('touchend',onEnd,true);document.removeEventListener('mousemove',onMouse,true);
+        document.removeEventListener('click',onClick,true);ov.remove();tip.remove();}
+      document.addEventListener('touchstart',onTouch,{capture:true,passive:false});
+      document.addEventListener('touchmove',onTouch,{capture:true,passive:false});
+      document.addEventListener('touchend',onEnd,{capture:true,passive:false});
+      document.addEventListener('mousemove',onMouse,true);
+      document.addEventListener('click',onClick,true);
     })();
     """
 

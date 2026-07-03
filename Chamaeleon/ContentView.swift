@@ -254,6 +254,9 @@ private struct HeaderBar: View {
                 }
             }
             Divider()
+            if !tab.active.isHome {
+                Button { tab.active.findOnPage() } label: { Label("ページ内を検索", systemImage: "magnifyingglass") }
+            }
             Button { onNewTab() } label: { Label("新しいタブ", systemImage: "plus") }
             if tabCount > 1 {
                 Button(role: .destructive) { onCloseTab(activeIndex) } label: { Label("このタブを閉じる", systemImage: "xmark") }
