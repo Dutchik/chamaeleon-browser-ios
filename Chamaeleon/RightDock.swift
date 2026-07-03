@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 操作記録のセッション（ドックの開閉に関係なく記録を継続）
+/// 操作記録のセッション（右パネルの開閉に関係なく記録を継続）
 @MainActor
 final class RecordSession: ObservableObject {
     @Published var active = false
@@ -38,45 +38,49 @@ final class RecordSession: ObservableObject {
     }
 }
 
-/// 右ドックをアクティブペインに追従させるホスト
+/// 右パネルをアクティブペインに追従させるホスト
 struct DockHost: View {
     @ObservedObject var tab: BrowserTab
-    @ObservedObject var flowStore: FlowStore
+    @ObservedObject var store: ProfileStore
     @ObservedObject var session: RecordSession
     let accent: Color
+    let editorIsStyle: Bool
     @Binding var expanded: Bool
-    @Binding var status: String?
-    let onRunFlow: (Flow, BrowserModel) -> Void
+    let onCloseStyle: () -> Void
+    let onCloseRecord: () -> Void
     let onSaveFlow: (Flow) -> Void
 
     var body: some View {
-        RightDock(model: tab.active, flowStore: flowStore, session: session, accent: accent,
-                  expanded: $expanded, status: $status,
-                  onRunFlow: { onRunFlow($0, tab.active) }, onSaveFlow: onSaveFlow)
+        RightDock(model: tab.active, store: store, session: session, accent: accent,
+                  editorIsStyle: editorIsStyle, expanded: $expanded,
+                  onCloseStyle: onCloseStyle, onCloseRecord: onCloseRecord, onSaveFlow: onSaveFlow)
     }
 }
 
-/// 右側のドック: 自動化の登録ログ（操作記録）・実行できるフローを右側に「閉じて」配置し、
-/// 記録開始などで右端の展開タブから開く。
+/// 右側パネル: 自動化の登録内容（操作記録）や CSS/スタイル設定の入力エリア。
+/// 閉じている間は右端の展開タブ、要素選択時は自動で畳んでページを見せる。
 struct RightDock: View {
     @ObservedObject var model: BrowserModel
-    @ObservedObject var flowStore: FlowStore
+    @ObservedObject var store: ProfileStore
     @ObservedObject var session: RecordSession
     let accent: Color
+    let editorIsStyle: Bool
     @Binding var expanded: Bool
-    @Binding var status: String?
-    let onRunFlow: (Flow) -> Void
+    let onCloseStyle: () -> Void
+    let onCloseRecord: () -> Void
     let onSaveFlow: (Flow) -> Void
 
-    private var matched: [Flow] { model.isHome ? [] : flowStore.matched(for: model.currentURL) }
-    private var hasContent: Bool { session.active || !matched.isEmpty || status != nil }
+    private var hasContent: Bool { session.active || editorIsStyle }
+    private var title: String { editorIsStyle ? "🎨 スタイル編集" : "⏺ 操作の記録" }
+    private var edgeIcon: String { editorIsStyle ? "paintbrush.pointed.fill" : "record.circle.fill" }
+    private var edgeColor: Color { editorIsStyle ? accent : .red }
 
     var body: some View {
         if hasContent {
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
                 if expanded {
-                    panel.frame(width: 300).transition(.move(edge: .trailing))
+                    panel.frame(width: 320).transition(.move(edge: .trailing))
                 } else {
                     edgeTab.transition(.move(edge: .trailing))
                 }
@@ -88,16 +92,11 @@ struct RightDock: View {
     private var edgeTab: some View {
         Button { withAnimation { expanded = true } } label: {
             VStack(spacing: 6) {
-                Image(systemName: session.active ? "record.circle.fill" : "bolt.horizontal.circle.fill")
-                    .font(.system(size: 18))
-                if session.active {
-                    Text("記録").font(.system(size: 10, weight: .bold))
-                } else {
-                    Text("\(matched.count)").font(.system(size: 12, weight: .bold))
-                }
+                Image(systemName: edgeIcon).font(.system(size: 18))
+                Text(editorIsStyle ? "編集" : "記録").font(.system(size: 10, weight: .bold))
                 Image(systemName: "chevron.left").font(.system(size: 10))
             }
-            .foregroundColor(session.active ? .red : accent)
+            .foregroundColor(edgeColor)
             .padding(.vertical, 12).padding(.horizontal, 7)
             .background(.regularMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -110,40 +109,22 @@ struct RightDock: View {
     private var panel: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(session.active ? "操作の記録" : "自動化").font(.system(size: 14, weight: .bold))
+                Text(title).font(.system(size: 14, weight: .bold))
                 Spacer()
                 Button { withAnimation { expanded = false } } label: {
                     Image(systemName: "chevron.right.2").font(.system(size: 14, weight: .semibold))
+                }
+                Button { editorIsStyle ? onCloseStyle() : onCloseRecord() } label: {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 18)).foregroundColor(.secondary)
                 }
             }
             .padding(.horizontal, 14).padding(.vertical, 10)
             Divider()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    if session.active { recordBody }
-                    if let s = status {
-                        Text(s).font(.system(size: 12, weight: .medium)).foregroundColor(.secondary).padding(.horizontal, 14)
-                    }
-                    if !matched.isEmpty {
-                        Text("このページのフロー").font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.secondary).padding(.horizontal, 14)
-                        ForEach(matched) { f in
-                            Button { onRunFlow(f) } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "play.fill").font(.system(size: 11))
-                                    Text(f.name).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 12).padding(.vertical, 8)
-                                .background(accent.opacity(0.14)).foregroundColor(accent)
-                                .clipShape(RoundedRectangle(cornerRadius: 9))
-                            }
-                            .padding(.horizontal, 14)
-                        }
-                    }
-                }
-                .padding(.vertical, 12)
+            if editorIsStyle {
+                StyleEditorBody(store: store, model: model, accent: accent, expanded: $expanded, onClose: onCloseStyle)
+            } else {
+                ScrollView { recordBody.padding(.vertical, 12) }
             }
         }
         .frame(maxHeight: .infinity)
@@ -151,7 +132,7 @@ struct RightDock: View {
         .overlay(Rectangle().frame(width: 1).foregroundColor(.primary.opacity(0.08)), alignment: .leading)
     }
 
-    // 記録本体
+    // 記録本体（何を登録しているか＝手順を可視化）
     private var recordBody: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -160,7 +141,8 @@ struct RightDock: View {
                 Spacer()
                 Text("\(session.steps.count)手順").font(.system(size: 11)).foregroundColor(.secondary)
             }
-            Text("ページを操作すると手順が記録されます。").font(.system(size: 11)).foregroundColor(.secondary)
+            Text("ページを操作すると、登録される手順がここに表示されます。")
+                .font(.system(size: 11)).foregroundColor(.secondary)
 
             if session.steps.isEmpty {
                 Text("まだ手順がありません").font(.system(size: 12)).foregroundColor(.secondary)
@@ -175,6 +157,9 @@ struct RightDock: View {
                                 Text(FlowActionType(rawValue: s.type)?.title ?? s.type).font(.system(size: 12, weight: .semibold))
                                 Text(s.selector ?? "").font(.system(size: 10, design: .monospaced))
                                     .foregroundColor(.secondary).lineLimit(1)
+                                if let v = s.value, !v.isEmpty {
+                                    Text("値: \(v)").font(.system(size: 10)).foregroundColor(.secondary).lineLimit(1)
+                                }
                             }
                             Spacer()
                             Button { session.steps.remove(at: i) } label: {

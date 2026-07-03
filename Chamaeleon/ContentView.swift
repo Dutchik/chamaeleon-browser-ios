@@ -47,11 +47,12 @@ struct ContentView: View {
                 content
             }
 
-            // 右ドック（自動化ログ・実行できるフロー）
+            // 右パネル（操作記録の登録内容 / スタイル設定の入力エリア）
             if let tab = activeTab {
-                DockHost(tab: tab, flowStore: flowStore, session: recordSession, accent: accent,
-                         expanded: $dockExpanded, status: $flowStatus,
-                         onRunFlow: { flow, model in runFlow(flow, model: model) },
+                DockHost(tab: tab, store: store, session: recordSession, accent: accent,
+                         editorIsStyle: editor == .style, expanded: $dockExpanded,
+                         onCloseStyle: { active?.clearPreview(); editor = .none },
+                         onCloseRecord: { recordSession.stop() },
                          onSaveFlow: { flow in dockExpanded = false; wizardFlow = flow })
             }
 
@@ -75,10 +76,28 @@ struct ContentView: View {
                 .frame(width: 290).frame(maxHeight: .infinity)
                 .background(Color(uiColor: .systemBackground))
                 .transition(.move(edge: .leading))
+                .gesture(
+                    DragGesture(minimumDistance: 20)
+                        .onEnded { v in
+                            if v.translation.width < -45 { withAnimation { showDrawer = false } }
+                        }
+                )
             }
 
-            // 下部スタイル編集パネル（ページを見ながら）
-            inlineEditorPanel
+            // フロー実行のステータス表示（トースト）
+            if let s = flowStatus {
+                VStack {
+                    Spacer()
+                    Text(s).font(.system(size: 13, weight: .medium))
+                        .padding(.horizontal, 16).padding(.vertical, 10)
+                        .background(.regularMaterial).clipShape(Capsule())
+                        .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+                        .padding(.bottom, 28)
+                }
+                .frame(maxWidth: .infinity)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
         }
         .tint(accent)
         .onAppear { if tabs.isEmpty { tabs = [BrowserTab(home: true)] } }
@@ -177,24 +196,15 @@ struct ContentView: View {
     private func toggleRecord() {
         if recordSession.active { recordSession.stop(); return }
         guard let m = active, !m.isHome else { return }
+        editor = .none            // スタイル編集を閉じて記録に切替
         recordSession.start(m)
-        dockExpanded = false   // 右側に閉じて配置（展開タブから開く）
+        dockExpanded = false      // 右側に閉じて配置（展開タブから開く）
     }
 
     private func openStyle() {
         if active?.isHome == true { return }
         editor = .style
-    }
-
-    @ViewBuilder
-    private var inlineEditorPanel: some View {
-        if let model = active, editor == .style {
-            VStack {
-                Spacer()
-                InlineStylePanel(store: store, model: model) { editor = .none }
-            }
-            .transition(.move(edge: .bottom))
-        }
+        dockExpanded = true       // 右から設定パネルを出す
     }
 
     private func closeTab(at index: Int) {
