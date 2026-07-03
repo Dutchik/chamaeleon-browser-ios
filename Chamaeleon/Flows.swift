@@ -57,6 +57,7 @@ struct FlowStep: Codable, Identifiable, Equatable {
 struct Flow: Codable, Identifiable, Equatable {
     var id = UUID().uuidString
     var name = ""
+    var note = ""
     var enabled = true
     var matchType: MatchType = .domain
     var matchPattern = ""
@@ -71,6 +72,29 @@ struct Flow: Codable, Identifiable, Equatable {
         var p = SiteProfile()
         p.enabled = enabled; p.matchType = matchType; p.matchPattern = matchPattern
         return p.matches(url)
+    }
+
+    init() {}
+
+    // 旧バージョンで保存したフロー（note等が無い）も読めるよう寛容にデコード
+    enum CodingKeys: String, CodingKey {
+        case id, name, note, enabled, matchType, matchPattern, startUrl
+        case useCredentials, credentialId, steps, createdAt, updatedAt
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        matchType = try c.decodeIfPresent(MatchType.self, forKey: .matchType) ?? .domain
+        matchPattern = try c.decodeIfPresent(String.self, forKey: .matchPattern) ?? ""
+        startUrl = try c.decodeIfPresent(String.self, forKey: .startUrl) ?? ""
+        useCredentials = try c.decodeIfPresent(Bool.self, forKey: .useCredentials) ?? false
+        credentialId = try c.decodeIfPresent(String.self, forKey: .credentialId)
+        steps = try c.decodeIfPresent([FlowStep].self, forKey: .steps) ?? []
+        createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt) ?? ISO8601DateFormatter().string(from: Date())
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt) ?? ISO8601DateFormatter().string(from: Date())
     }
 }
 

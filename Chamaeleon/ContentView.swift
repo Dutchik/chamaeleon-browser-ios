@@ -59,7 +59,14 @@ struct ContentView: View {
         .onAppear {
             if tabs.isEmpty { tabs = [BrowserModel(home: true)] }
         }
-        .sheet(isPresented: $showPanel) { if let m = active { SitePanelView(store: store, model: m) } }
+        .sheet(isPresented: $showPanel) {
+            if let m = active {
+                SitePanelView(store: store, model: m, flowStore: flowStore, credStore: credStore) { flow in
+                    showPanel = false
+                    runFlow(flow, model: m)
+                }
+            }
+        }
         .sheet(isPresented: $showLibrary) { if let m = active { LibraryView(library: library, model: m) } }
         .sheet(isPresented: $showFlows) { if let m = active { FlowListView(flowStore: flowStore, credStore: credStore, model: m) } }
         .sheet(isPresented: $showCreds) { CredentialsView(store: credStore) }

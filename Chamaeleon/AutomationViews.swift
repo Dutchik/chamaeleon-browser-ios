@@ -94,6 +94,7 @@ struct FlowWizardView: View {
             Form {
                 Section("対象") {
                     TextField("フロー名", text: $flow.name)
+                    TextField("メモ（任意）", text: $flow.note, axis: .vertical).lineLimit(1...4)
                     TextField("開始URL", text: $flow.startUrl).autocapitalization(.none).autocorrectionDisabled()
                     Picker("マッチ方式", selection: $flow.matchType) {
                         ForEach(MatchType.allCases) { Text($0.title).tag($0) }
