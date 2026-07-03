@@ -26,6 +26,12 @@ struct BlockRulesView: View {
                         .font(.system(size: 11)).foregroundColor(.secondary)
                 }
 
+                Section {
+                    Toggle("パケット層キャプチャ（流れたメディアを保存）", isOn: $netRules.captureEnabled)
+                    Text("自前Cプロキシ経由で、ページを閲覧中に流れた画像・動画等を再取得せずそのまま保存します（保存先＝アプリ内 ChamaeleonDownloads/capture）。iOS 17以降。※iOSは平文HTTPのみ対応（HTTPSは今後のOpenSSL統合で対応予定）。")
+                        .font(.system(size: 11)).foregroundColor(netRules.captureEnabled ? .green : .secondary)
+                } header: { Text("パケット層ダウンロード（実験）") }
+
                 Section("ルールを追加") {
                     Picker("種類", selection: $newAction) {
                         ForEach(NetAction.allCases) { Text($0.title).tag($0) }

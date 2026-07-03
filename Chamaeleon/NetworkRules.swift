@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import Network
 
 enum NetAction: String, Codable, CaseIterable, Identifiable {
     case block          // ネットワークリクエストをブロック（広告等）
@@ -47,6 +48,8 @@ final class NetRuleStore: ObservableObject {
     @Published var rules: [NetRule] { didSet { persist(); refresh() } }
     @Published private(set) var compiledList: WKContentRuleList?
     @Published private(set) var version = 0
+    /// パケット層キャプチャ（自前Cプロキシ経由、iOS17+）。iOSはOpenSSL非搭載のため平文HTTPのみ。
+    @Published var captureEnabled: Bool { didSet { d.set(captureEnabled, forKey: "chm_capture_on"); applyProxyCapture() } }
 
     private let d = UserDefaults.standard
     private var url: URL {
@@ -54,8 +57,32 @@ final class NetRuleStore: ObservableObject {
             .appendingPathComponent("chamaeleon-netrules.json")
     }
 
+    var captureDir: URL {
+        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ChamaeleonDownloads/capture", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+    /// 自前Cプロキシを起動し WKWebView を経由させ、メディアをキャプチャ（iOS17+）
+    func applyProxyCapture() {
+        if #available(iOS 17.0, *) {
+            if captureEnabled {
+                let port = chm_proxy_start(0)
+                if port > 0, let p = NWEndpoint.Port(rawValue: UInt16(port)) {
+                    chm_proxy_set_capture(captureDir.path, 1)
+                    WKWebsiteDataStore.default().proxyConfigurations = [ProxyConfiguration(httpCONNECTProxy: .hostPort(host: "127.0.0.1", port: p))]
+                } else { captureEnabled = false }
+            } else {
+                chm_proxy_set_capture(nil, 0)
+                WKWebsiteDataStore.default().proxyConfigurations = []
+                chm_proxy_stop()
+            }
+        }
+    }
+
     init() {
         masterEnabled = d.object(forKey: "chm_block_on") as? Bool ?? true
+        captureEnabled = d.object(forKey: "chm_capture_on") as? Bool ?? false
         let u = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("chamaeleon-netrules.json")
         if let data = try? Data(contentsOf: u), let v = try? JSONDecoder().decode([NetRule].self, from: data) {
@@ -64,6 +91,7 @@ final class NetRuleStore: ObservableObject {
             rules = NetRuleStore.defaults()
         }
         refresh()
+        applyProxyCapture()
     }
 
     static func defaults() -> [NetRule] {

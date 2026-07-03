@@ -12,6 +12,7 @@
 		08B5A099922BF433460C83FB /* AutomationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD2F935DF7A32E3804D4ECB /* AutomationViews.swift */; };
 		1767A28ED74EF4070C26AC5C /* InlineEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990A3786A5DA6ECF1C451A2B /* InlineEditors.swift */; };
 		298FA1C0E5494CAFCF84D487 /* Downloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E8B43B0467330126C1F46C /* Downloader.swift */; };
+		3B02B51844AB6EA2A616BBAC /* chm_mitm.c in Sources */ = {isa = PBXBuildFile; fileRef = B4711269CFFAC351E83D3D07 /* chm_mitm.c */; };
 		4039E4108CAFAA9E1DD5F5C4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFF6B0836E900A30342E0501 /* ContentView.swift */; };
 		4417805D544535FA9509D33A /* ChamaeleonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F461DC464DB648E236420F /* ChamaeleonApp.swift */; };
 		4A7E30A3E3D7F3C4E482F45D /* HomeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2890385F303105C17FCFBEF5 /* HomeSettingsView.swift */; };
@@ -24,6 +25,7 @@
 		AC611DB15E68D62C10886D58 /* HomeExtras.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E4779EC0403DAA74E9248CB /* HomeExtras.swift */; };
 		BB2BB125B0BD854E0170DF54 /* CalendarWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9AA08EE2BE8FC41679EA8A /* CalendarWidget.swift */; };
 		CA3D8516F5C38242E1458E2B /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E780023D128EA391150AC23E /* LibraryView.swift */; };
+		D3141430FB708D139BCB0386 /* chm_proxy.c in Sources */ = {isa = PBXBuildFile; fileRef = DBD5BC8CCD1651DBE2F71C03 /* chm_proxy.c */; };
 		EF8024589AEF48D973ACF5B4 /* SitePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */; };
 		F0050B0A267FD008E845DA80 /* BlockRulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42501433C23974F50398545D /* BlockRulesView.swift */; };
 		FE4C7156642D3D3FA2EC2154 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6844D9CDAE8B6AEC266DFCBD /* Assets.xcassets */; };
@@ -31,6 +33,7 @@
 
 /* Begin PBXFileReference section */
 		0801B4DA839C7757AA452DFA /* Chamaeleon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chamaeleon.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0906CF5D6A93B48E8628F248 /* chm_proxy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = chm_proxy.h; sourceTree = "<group>"; };
 		1E4779EC0403DAA74E9248CB /* HomeExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeExtras.swift; sourceTree = "<group>"; };
 		1F50170434CFF214B731F038 /* ChamaeleonAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChamaeleonAgent.swift; sourceTree = "<group>"; };
 		2890385F303105C17FCFBEF5 /* HomeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSettingsView.swift; sourceTree = "<group>"; };
@@ -42,13 +45,16 @@
 		59ECA3C858B8D87B046C102C /* chm_rules.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = chm_rules.c; sourceTree = "<group>"; };
 		65E8B43B0467330126C1F46C /* Downloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Downloader.swift; sourceTree = "<group>"; };
 		6844D9CDAE8B6AEC266DFCBD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		89CA9BF065A624B65DA96331 /* chm_mitm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = chm_mitm.h; sourceTree = "<group>"; };
 		990A3786A5DA6ECF1C451A2B /* InlineEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineEditors.swift; sourceTree = "<group>"; };
 		9DD2F935DF7A32E3804D4ECB /* AutomationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationViews.swift; sourceTree = "<group>"; };
 		A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePanelView.swift; sourceTree = "<group>"; };
 		B2F461DC464DB648E236420F /* ChamaeleonApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChamaeleonApp.swift; sourceTree = "<group>"; };
+		B4711269CFFAC351E83D3D07 /* chm_mitm.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = chm_mitm.c; sourceTree = "<group>"; };
 		B6CAEE319BD1915BE82F4880 /* Flows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Flows.swift; sourceTree = "<group>"; };
 		BEAF0272A211B254419A134C /* StartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartView.swift; sourceTree = "<group>"; };
 		CC9AA08EE2BE8FC41679EA8A /* CalendarWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarWidget.swift; sourceTree = "<group>"; };
+		DBD5BC8CCD1651DBE2F71C03 /* chm_proxy.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = chm_proxy.c; sourceTree = "<group>"; };
 		DDAA831A329E93EC2B1F7157 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
 		DDDC9A7690550BC02C5E3F26 /* NetworkRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkRules.swift; sourceTree = "<group>"; };
 		E780023D128EA391150AC23E /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
@@ -67,6 +73,10 @@
 				3BA46549524CFDDEEC52A4D4 /* Chamaeleon-Bridging-Header.h */,
 				1F50170434CFF214B731F038 /* ChamaeleonAgent.swift */,
 				B2F461DC464DB648E236420F /* ChamaeleonApp.swift */,
+				B4711269CFFAC351E83D3D07 /* chm_mitm.c */,
+				89CA9BF065A624B65DA96331 /* chm_mitm.h */,
+				DBD5BC8CCD1651DBE2F71C03 /* chm_proxy.c */,
+				0906CF5D6A93B48E8628F248 /* chm_proxy.h */,
 				59ECA3C858B8D87B046C102C /* chm_rules.c */,
 				3283656222EF55B7806D8598 /* chm_rules.h */,
 				EFF6B0836E900A30342E0501 /* ContentView.swift */,
@@ -189,6 +199,8 @@
 				84208A03312190389505DA95 /* RightDock.swift in Sources */,
 				EF8024589AEF48D973ACF5B4 /* SitePanelView.swift in Sources */,
 				9F60AFBE56472356BE1AC52B /* StartView.swift in Sources */,
+				3B02B51844AB6EA2A616BBAC /* chm_mitm.c in Sources */,
+				D3141430FB708D139BCB0386 /* chm_proxy.c in Sources */,
 				913C1DAC76D6F20FE4169A24 /* chm_rules.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
