@@ -5,6 +5,7 @@ import WebKit
 struct BrowserView: UIViewRepresentable {
     @ObservedObject var model: BrowserModel
     @ObservedObject var store: ProfileStore
+    var onVisit: ((String, String) -> Void)? = nil
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -21,14 +22,28 @@ struct BrowserView: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {}
 
-    func makeCoordinator() -> Coordinator { Coordinator(model: model, store: store) }
+    func makeCoordinator() -> Coordinator { Coordinator(model: model, store: store, onVisit: onVisit) }
 
     final class Coordinator: NSObject, WKNavigationDelegate {
         let model: BrowserModel
         let store: ProfileStore
-        init(model: BrowserModel, store: ProfileStore) {
+        let onVisit: ((String, String) -> Void)?
+        init(model: BrowserModel, store: ProfileStore, onVisit: ((String, String) -> Void)?) {
             self.model = model
             self.store = store
+            self.onVisit = onVisit
+        }
+
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            Task { @MainActor in model.isLoading = true }
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            Task { @MainActor in model.isLoading = false }
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            Task { @MainActor in model.isLoading = false }
         }
 
         func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
@@ -49,6 +64,8 @@ struct BrowserView: UIViewRepresentable {
                 model.title = webView.title ?? ""
                 model.canGoBack = webView.canGoBack
                 model.canGoForward = webView.canGoForward
+                model.isLoading = false
+                onVisit?(url, webView.title ?? "")
                 let matched = store.matched(for: url)
                 model.matchedCount = matched.count
                 PatchEngine.apply(profiles: matched, stage: .documentEnd, to: webView)
@@ -70,6 +87,7 @@ final class BrowserModel: ObservableObject, Identifiable {
     @Published var title = ""
     @Published var canGoBack = false
     @Published var canGoForward = false
+    @Published var isLoading = false
     @Published var matchedCount = 0
     weak var webView: WKWebView?
 

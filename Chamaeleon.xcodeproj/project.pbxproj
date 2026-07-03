@@ -11,6 +11,7 @@
 		4039E4108CAFAA9E1DD5F5C4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFF6B0836E900A30342E0501 /* ContentView.swift */; };
 		4417805D544535FA9509D33A /* ChamaeleonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F461DC464DB648E236420F /* ChamaeleonApp.swift */; };
 		A20E7F615E12C9A69F5BC3CD /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDAA831A329E93EC2B1F7157 /* BrowserView.swift */; };
+		CA3D8516F5C38242E1458E2B /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E780023D128EA391150AC23E /* LibraryView.swift */; };
 		EF8024589AEF48D973ACF5B4 /* SitePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */; };
 /* End PBXBuildFile section */
 
@@ -20,6 +21,7 @@
 		A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePanelView.swift; sourceTree = "<group>"; };
 		B2F461DC464DB648E236420F /* ChamaeleonApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChamaeleonApp.swift; sourceTree = "<group>"; };
 		DDAA831A329E93EC2B1F7157 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
+		E780023D128EA391150AC23E /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		EFF6B0836E900A30342E0501 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -30,6 +32,7 @@
 				DDAA831A329E93EC2B1F7157 /* BrowserView.swift */,
 				B2F461DC464DB648E236420F /* ChamaeleonApp.swift */,
 				EFF6B0836E900A30342E0501 /* ContentView.swift */,
+				E780023D128EA391150AC23E /* LibraryView.swift */,
 				534865698659E829E6586B49 /* Models.swift */,
 				A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */,
 			);
@@ -113,6 +116,7 @@
 				A20E7F615E12C9A69F5BC3CD /* BrowserView.swift in Sources */,
 				4417805D544535FA9509D33A /* ChamaeleonApp.swift in Sources */,
 				4039E4108CAFAA9E1DD5F5C4 /* ContentView.swift in Sources */,
+				CA3D8516F5C38242E1458E2B /* LibraryView.swift in Sources */,
 				085496E0265E938FA1D5996B /* Models.swift in Sources */,
 				EF8024589AEF48D973ACF5B4 /* SitePanelView.swift in Sources */,
 			);

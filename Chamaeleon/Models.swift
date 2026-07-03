@@ -137,3 +137,61 @@ final class ProfileStore: ObservableObject {
         profiles.filter { $0.matches(url) }
     }
 }
+
+
+// MARK: - ブックマーク・履歴（仕様§4.1）
+
+struct Bookmark: Codable, Identifiable, Equatable {
+    var id = UUID().uuidString
+    var title = ""
+    var url = ""
+    var createdAt = ISO8601DateFormatter().string(from: Date())
+}
+
+struct HistoryEntry: Codable, Identifiable, Equatable {
+    var id = UUID().uuidString
+    var title = ""
+    var url = ""
+    var visitedAt = ISO8601DateFormatter().string(from: Date())
+}
+
+/// ブックマーク・履歴・設定のストア（Documents内のJSON）
+@MainActor
+final class LibraryStore: ObservableObject {
+    @Published var bookmarks: [Bookmark] = [] { didSet { save(bookmarks, "chamaeleon-bookmarks.json") } }
+    @Published var history: [HistoryEntry] = [] { didSet { save(Array(history.prefix(5000)), "chamaeleon-history.json") } }
+    @Published var homepage: String {
+        didSet { UserDefaults.standard.set(homepage, forKey: "homepage") }
+    }
+
+    private func fileURL(_ name: String) -> URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(name)
+    }
+
+    init() {
+        homepage = UserDefaults.standard.string(forKey: "homepage") ?? "https://duckduckgo.com"
+        if let d = try? Data(contentsOf: fileURL("chamaeleon-bookmarks.json")),
+           let v = try? JSONDecoder().decode([Bookmark].self, from: d) { bookmarks = v }
+        if let d = try? Data(contentsOf: fileURL("chamaeleon-history.json")),
+           let v = try? JSONDecoder().decode([HistoryEntry].self, from: d) { history = v }
+    }
+
+    private func save<T: Encodable>(_ value: T, _ name: String) {
+        if let data = try? JSONEncoder().encode(value) {
+            try? data.write(to: fileURL(name), options: .atomic)
+        }
+    }
+
+    func isBookmarked(_ url: String) -> Bool { bookmarks.contains { $0.url == url } }
+
+    func toggleBookmark(url: String, title: String) {
+        if isBookmarked(url) { bookmarks.removeAll { $0.url == url } }
+        else { bookmarks.insert(Bookmark(title: title.isEmpty ? url : title, url: url), at: 0) }
+    }
+
+    func recordVisit(url: String, title: String) {
+        guard url.hasPrefix("http") else { return }
+        history.insert(HistoryEntry(title: title, url: url), at: 0)
+    }
+}
