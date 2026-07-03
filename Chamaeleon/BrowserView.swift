@@ -57,7 +57,7 @@ struct BrowserView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
             let url = webView.url?.absoluteString ?? ""
             Task { @MainActor in
-                model.currentURL = url; model.urlInput = url
+                model.currentURL = url; model.urlInput = url; model.urlString = url
                 PatchEngine.apply(profiles: store.matched(for: url), stage: .documentStart, to: webView)
             }
         }

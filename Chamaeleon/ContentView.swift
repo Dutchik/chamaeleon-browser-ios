@@ -1,5 +1,16 @@
 import SwiftUI
 
+/// 1タブ = 複数ペイン（分割表示）。分割してもアプリ共通ヘッダーは残る。
+@MainActor
+final class BrowserTab: ObservableObject, Identifiable {
+    let id = UUID()
+    @Published var panes: [BrowserModel]
+    @Published var axis: Axis = .horizontal   // 2〜3分割時の並び方向
+    @Published var activePane = 0
+    init(home: Bool = true) { panes = [BrowserModel(home: home)] }
+    var active: BrowserModel { panes[min(max(activePane, 0), panes.count - 1)] }
+}
+
 struct ContentView: View {
     @StateObject private var store = ProfileStore()
     @StateObject private var library = LibraryStore()
@@ -8,7 +19,7 @@ struct ContentView: View {
     @StateObject private var settings = AppSettingsStore()
     @StateObject private var splitStore = SplitStore()
 
-    @State private var tabs: [BrowserModel] = []
+    @State private var tabs: [BrowserTab] = []
     @State private var activeIndex = 0
     @State private var showPanel = false
     @State private var showLibrary = false
@@ -19,15 +30,14 @@ struct ContentView: View {
     @State private var editor: InlineEditor = .none
     @State private var wizardFlow: Flow?
     @State private var runInputFlow: Flow?
-    @State private var activeSplit: SplitConfig?
     @State private var flowStatus: String?
     @FocusState private var urlFocused: Bool
 
     private var accent: Color { Color(hex: settings.accentHex) }
-
-    private var active: BrowserModel? {
+    private var activeTab: BrowserTab? {
         tabs.indices.contains(activeIndex) ? tabs[activeIndex] : tabs.first
     }
+    private var active: BrowserModel? { activeTab?.active }
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -51,7 +61,7 @@ struct ContentView: View {
                     onSite: { showDrawer = false; showPanel = true },
                     onLibrary: { showDrawer = false; showLibrary = true },
                     onRecord: { showDrawer = false; openEditor(.record) },
-                    onSplit: { showDrawer = false; activeSplit = SplitConfig() },
+                    onSplit: { showDrawer = false; splitTab(.horizontal) },
                     onHomeSettings: { showDrawer = false; showHomeSettings = true },
                     onHome: { showDrawer = false; active?.goHome() },
                     isRecording: editor == .record
@@ -66,12 +76,7 @@ struct ContentView: View {
         }
         .tint(accent)
         .onAppear {
-            if tabs.isEmpty { tabs = [BrowserModel(home: true)] }
-        }
-        .fullScreenCover(item: $activeSplit) { cfg in
-            SplitContainerView(store: store, splitStore: splitStore, config: cfg, accent: accent) {
-                activeSplit = nil
-            }
+            if tabs.isEmpty { tabs = [BrowserTab(home: true)] }
         }
         .sheet(isPresented: $showHomeSettings) { HomeSettingsView(settings: settings) }
         .sheet(isPresented: $showPanel) {
@@ -92,6 +97,91 @@ struct ContentView: View {
             RunInputSheet(flow: f) { inputs in
                 if let m = active { execFlow(f, model: m, inputs: inputs) }
             }
+        }
+    }
+
+    // MARK: - コンテンツ（タブ毎のペイン群。分割してもヘッダーは上に残る）
+
+    private var content: some View {
+        ZStack {
+            ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+                TabPanesView(tab: tab, store: store, library: library, settings: settings,
+                             flowStore: flowStore, splitStore: splitStore, accent: accent,
+                             onRunFlow: { flow, model in runFlow(flow, model: model) },
+                             onOpenSplit: { cfg in openSplit(cfg) },
+                             onNewSplit: { splitTab(.horizontal) })
+                    .opacity(index == activeIndex ? 1 : 0)
+                    .allowsHitTesting(index == activeIndex)
+            }
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    // MARK: - 分割操作
+
+    private func splitTab(_ axis: Axis) {
+        guard let tab = activeTab, tab.panes.count < 4 else { return }
+        tab.axis = axis
+        // 新規ペインは従来通りの検索画面（ホーム）
+        tab.panes.append(BrowserModel(home: true))
+        tab.activePane = tab.panes.count - 1
+    }
+
+    private func saveSplitToHome() {
+        guard let tab = activeTab, tab.panes.count > 1 else { return }
+        var cfg = SplitConfig()
+        cfg.urls = tab.panes.map { $0.isHome ? "" : $0.currentURL }
+        cfg.layout = tab.panes.count >= 4 ? .grid4
+            : tab.panes.count == 3 ? .triptych
+            : (tab.axis == .vertical ? .rows2 : .columns2)
+        cfg.name = URL(string: cfg.urls.first(where: { !$0.isEmpty }) ?? "")?.host ?? "分割ビュー"
+        cfg.pinnedToHome = true
+        splitStore.configs.insert(cfg, at: 0)
+    }
+
+    /// 保存済みの分割設定を現在のタブに展開（URL未指定ペインはホーム）
+    private func openSplit(_ cfg: SplitConfig) {
+        guard let tab = activeTab else { return }
+        var models: [BrowserModel] = []
+        for raw in cfg.urls.prefix(4) {
+            let t = raw.trimmingCharacters(in: .whitespaces)
+            if t.isEmpty {
+                models.append(BrowserModel(home: true))
+            } else {
+                models.append(BrowserModel(home: false, url: t.hasPrefix("http") ? t : "https://" + t))
+            }
+        }
+        if models.isEmpty { models = [BrowserModel(home: true)] }
+        tab.axis = cfg.layout == .rows2 ? .vertical : .horizontal
+        tab.panes = models
+        tab.activePane = 0
+    }
+
+    // MARK: - フロー実行ヘッダー
+
+    @ViewBuilder
+    private var flowHeader: some View {
+        if let tab = activeTab {
+            FlowHeaderHost(tab: tab, flowStore: flowStore, status: $flowStatus) { flow, model in
+                runFlow(flow, model: model)
+            }
+        }
+    }
+
+    private func runFlow(_ flow: Flow, model: BrowserModel) {
+        if !flow.promptSteps.isEmpty {
+            runInputFlow = flow
+        } else {
+            execFlow(flow, model: model, inputs: [:])
+        }
+    }
+
+    private func execFlow(_ flow: Flow, model: BrowserModel, inputs: [String: String]) {
+        model.isHome = false
+        Task {
+            await FlowRunner.run(flow, model: model, creds: credStore, inputs: inputs) { s in flowStatus = s }
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            flowStatus = nil
         }
     }
 
@@ -119,52 +209,189 @@ struct ContentView: View {
     }
 
     private func openEditor(_ e: InlineEditor) {
-        // ホーム画面では編集対象のページが無いので開かない
         if active?.isHome == true { return }
         editor = e
     }
 
-    // MARK: - コンテンツ（ホーム or WebView）
+    // MARK: - タブバー
 
-    private var content: some View {
-        ZStack {
-            ForEach(Array(tabs.enumerated()), id: \.element.id) { index, model in
+    private var tabBar: some View {
+        HStack(spacing: 6) {
+            Button { withAnimation { showDrawer.toggle() } } label: {
+                Image(systemName: "line.3.horizontal").font(.system(size: 16, weight: .semibold))
+            }
+            .padding(.leading, 10)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+                        TabChip(tab: tab, isActive: index == activeIndex,
+                                showClose: tabs.count > 1,
+                                onSelect: { activeIndex = index },
+                                onClose: { closeTab(at: index) })
+                    }
+                    Button {
+                        tabs.append(BrowserTab(home: true))
+                        activeIndex = tabs.count - 1
+                    } label: {
+                        Image(systemName: "plus").font(.system(size: 13, weight: .bold))
+                    }
+                    .padding(.horizontal, 8)
+                }
+                .padding(.vertical, 5)
+            }
+        }
+        .background(Color(uiColor: .systemBackground))
+    }
+
+    private func closeTab(at index: Int) {
+        tabs.remove(at: index)
+        if tabs.isEmpty {
+            tabs = [BrowserTab(home: true)]
+            activeIndex = 0
+        } else if activeIndex >= tabs.count {
+            activeIndex = tabs.count - 1
+        }
+    }
+
+    // MARK: - ナビゲーションバー
+
+    @ViewBuilder
+    private var navBar: some View {
+        if let tab = activeTab {
+            NavBarHost(tab: tab, library: library, settings: settings,
+                       showPanel: $showPanel, urlFocused: $urlFocused,
+                       onSplit: { axis in splitTab(axis) },
+                       onSaveSplit: { saveSplitToHome() })
+        }
+    }
+}
+
+// MARK: - タブ内のペイン描画（分割）
+
+private struct TabPanesView: View {
+    @ObservedObject var tab: BrowserTab
+    @ObservedObject var store: ProfileStore
+    @ObservedObject var library: LibraryStore
+    @ObservedObject var settings: AppSettingsStore
+    @ObservedObject var flowStore: FlowStore
+    @ObservedObject var splitStore: SplitStore
+    let accent: Color
+    let onRunFlow: (Flow, BrowserModel) -> Void
+    let onOpenSplit: (SplitConfig) -> Void
+    let onNewSplit: () -> Void
+
+    var body: some View {
+        Group {
+            if tab.panes.count == 4 {
+                VStack(spacing: 1) {
+                    HStack(spacing: 1) { pane(0); pane(1) }
+                    HStack(spacing: 1) { pane(2); pane(3) }
+                }
+            } else if tab.axis == .horizontal {
+                HStack(spacing: 1) {
+                    ForEach(Array(tab.panes.enumerated()), id: \.element.id) { i, _ in pane(i) }
+                }
+            } else {
+                VStack(spacing: 1) {
+                    ForEach(Array(tab.panes.enumerated()), id: \.element.id) { i, _ in pane(i) }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func pane(_ i: Int) -> some View {
+        if i < tab.panes.count {
+            let model = tab.panes[i]
+            VStack(spacing: 0) {
+                // 分割時のみ: ペインの選択・クローズ用ストリップ
+                if tab.panes.count > 1 {
+                    PaneStrip(model: model, isActive: i == tab.activePane, accent: accent,
+                              onSelect: { tab.activePane = i },
+                              onClose: { closePane(i) })
+                }
                 ZStack {
                     BrowserView(model: model, store: store) { url, title in
                         library.recordVisit(url: url, title: title)
                     }
                     if model.isHome {
+                        // 未指定の新規分割ペインは従来通りの検索画面
                         StartView(settings: settings, library: library, flowStore: flowStore, splitStore: splitStore,
-                                  onSearch: { target in model.navigate(target) },
-                                  onRunFlow: { flow in runFlow(flow, model: model) },
-                                  onOpenSplit: { cfg in activeSplit = cfg },
-                                  onNewSplit: { activeSplit = SplitConfig() })
+                                  onSearch: { model.navigate($0); tab.activePane = i },
+                                  onRunFlow: { f in onRunFlow(f, model) },
+                                  onOpenSplit: onOpenSplit,
+                                  onNewSplit: onNewSplit)
                     }
                 }
-                .opacity(index == activeIndex ? 1 : 0)
-                .allowsHitTesting(index == activeIndex)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+            .id(model.id)
         }
-        .ignoresSafeArea(edges: .bottom)
     }
 
-    // MARK: - フロー実行ヘッダー（マッチしたページで表示）
+    private func closePane(_ i: Int) {
+        guard tab.panes.count > 1 else { return }
+        tab.panes.remove(at: i)
+        if tab.activePane >= tab.panes.count { tab.activePane = tab.panes.count - 1 }
+    }
+}
 
-    @ViewBuilder
-    private var flowHeader: some View {
-        if let model = active, !model.isHome {
+/// 分割ペイン上部の選択ストリップ
+private struct PaneStrip: View {
+    @ObservedObject var model: BrowserModel
+    let isActive: Bool
+    let accent: Color
+    let onSelect: () -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle().fill(isActive ? accent : Color.secondary.opacity(0.4)).frame(width: 7, height: 7)
+            Text(model.isHome ? "ホーム" : (model.title.isEmpty ? model.currentURL : model.title))
+                .font(.system(size: 11, weight: isActive ? .bold : .regular)).lineLimit(1)
+            Spacer()
+            Button(action: onClose) {
+                Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundColor(.secondary)
+            }.buttonStyle(.borderless)
+        }
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(isActive ? accent.opacity(0.14) : Color(uiColor: .secondarySystemBackground))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onSelect)
+    }
+}
+
+// MARK: - フロー実行ヘッダー（アクティブペインに追従）
+
+private struct FlowHeaderHost: View {
+    @ObservedObject var tab: BrowserTab
+    @ObservedObject var flowStore: FlowStore
+    @Binding var status: String?
+    let onRun: (Flow, BrowserModel) -> Void
+    var body: some View {
+        FlowHeaderInner(model: tab.active, flowStore: flowStore, status: $status, onRun: onRun)
+    }
+}
+
+private struct FlowHeaderInner: View {
+    @ObservedObject var model: BrowserModel
+    @ObservedObject var flowStore: FlowStore
+    @Binding var status: String?
+    let onRun: (Flow, BrowserModel) -> Void
+
+    var body: some View {
+        if !model.isHome {
             let matched = flowStore.matched(for: model.currentURL)
-            if !matched.isEmpty || flowStatus != nil {
+            if !matched.isEmpty || status != nil {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        if let s = flowStatus {
+                        if let s = status {
                             Text(s).font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.secondary).lineLimit(1)
                         }
                         ForEach(matched) { flow in
-                            Button {
-                                runFlow(flow, model: model)
-                            } label: {
+                            Button { onRun(flow, model) } label: {
                                 HStack(spacing: 4) {
                                     Image(systemName: "play.fill").font(.system(size: 10))
                                     Text(flow.name).font(.system(size: 12, weight: .semibold))
@@ -182,79 +409,10 @@ struct ContentView: View {
             }
         }
     }
-
-    private func runFlow(_ flow: Flow, model: BrowserModel) {
-        // 実行時入力があるフローは、まずフォームを表示
-        if !flow.promptSteps.isEmpty {
-            runInputFlow = flow
-        } else {
-            execFlow(flow, model: model, inputs: [:])
-        }
-    }
-
-    private func execFlow(_ flow: Flow, model: BrowserModel, inputs: [String: String]) {
-        model.isHome = false   // ホームから起動された場合はページを表示
-        Task {
-            await FlowRunner.run(flow, model: model, creds: credStore, inputs: inputs) { s in flowStatus = s }
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            flowStatus = nil
-        }
-    }
-
-    // MARK: - タブバー
-
-    private var tabBar: some View {
-        HStack(spacing: 6) {
-            Button { withAnimation { showDrawer.toggle() } } label: {
-                Image(systemName: "line.3.horizontal").font(.system(size: 16, weight: .semibold))
-            }
-            .padding(.leading, 10)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(Array(tabs.enumerated()), id: \.element.id) { index, model in
-                        TabChip(model: model, isActive: index == activeIndex,
-                                showClose: tabs.count > 1,
-                                onSelect: { activeIndex = index },
-                                onClose: { closeTab(at: index) })
-                    }
-                    Button {
-                        tabs.append(BrowserModel(home: true))
-                        activeIndex = tabs.count - 1
-                    } label: {
-                        Image(systemName: "plus").font(.system(size: 13, weight: .bold))
-                    }
-                    .padding(.horizontal, 8)
-                }
-                .padding(.vertical, 5)
-            }
-        }
-        .background(Color(uiColor: .systemBackground))
-    }
-
-    private func closeTab(at index: Int) {
-        tabs.remove(at: index)
-        if tabs.isEmpty {
-            tabs = [BrowserModel(home: true)]
-            activeIndex = 0
-        } else if activeIndex >= tabs.count {
-            activeIndex = tabs.count - 1
-        }
-    }
-
-    // MARK: - ナビゲーションバー
-
-    @ViewBuilder
-    private var navBar: some View {
-        if let model = active {
-            NavBarView(model: model, library: library, settings: settings,
-                       showPanel: $showPanel,
-                       urlFocused: $urlFocused)
-        }
-    }
 }
 
-/// 左ドロワー（ハンバーガーメニュー）
+// MARK: - 左ドロワー
+
 private struct DrawerView: View {
     @ObservedObject var library: LibraryStore
     @ObservedObject var settings: AppSettingsStore
@@ -296,7 +454,7 @@ private struct DrawerView: View {
                         Button { settings.engineId = e.id } label: {
                             HStack {
                                 Image(systemName: settings.engineId == e.id ? "largecircle.fill.circle" : "circle")
-                                    .foregroundColor(settings.engineId == e.id ? .green : .secondary)
+                                    .foregroundColor(settings.engineId == e.id ? Color(hex: settings.accentHex) : .secondary)
                                 Text(e.name).foregroundColor(.primary)
                                 Spacer()
                             }
@@ -321,9 +479,10 @@ private struct DrawerView: View {
     }
 }
 
-/// タブ1枚分のチップ（modelのtitleを購読）
+// MARK: - タブチップ
+
 private struct TabChip: View {
-    @ObservedObject var model: BrowserModel
+    @ObservedObject var tab: BrowserTab
     let isActive: Bool
     let showClose: Bool
     let onSelect: () -> Void
@@ -331,10 +490,10 @@ private struct TabChip: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Text(model.isHome ? "ホーム" : (model.title.isEmpty ? "New Tab" : model.title))
-                .font(.system(size: 12, weight: isActive ? .bold : .regular))
-                .lineLimit(1)
-                .frame(maxWidth: 120)
+            if tab.panes.count > 1 {
+                Image(systemName: "rectangle.split.2x1").font(.system(size: 10))
+            }
+            ChipTitle(model: tab.active, isActive: isActive)
             if showClose {
                 Button(action: onClose) {
                     Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
@@ -350,13 +509,44 @@ private struct TabChip: View {
     }
 }
 
-/// ナビバー本体（activeタブのBrowserModelを購読するため分離）
+private struct ChipTitle: View {
+    @ObservedObject var model: BrowserModel
+    let isActive: Bool
+    var body: some View {
+        Text(model.isHome ? "ホーム" : (model.title.isEmpty ? "New Tab" : model.title))
+            .font(.system(size: 12, weight: isActive ? .bold : .regular))
+            .lineLimit(1)
+            .frame(maxWidth: 120)
+    }
+}
+
+// MARK: - ナビバー（アクティブペインに追従）
+
+private struct NavBarHost: View {
+    @ObservedObject var tab: BrowserTab
+    @ObservedObject var library: LibraryStore
+    @ObservedObject var settings: AppSettingsStore
+    @Binding var showPanel: Bool
+    var urlFocused: FocusState<Bool>.Binding
+    let onSplit: (Axis) -> Void
+    let onSaveSplit: () -> Void
+
+    var body: some View {
+        NavBarView(model: tab.active, library: library, settings: settings,
+                   showPanel: $showPanel, urlFocused: urlFocused,
+                   paneCount: tab.panes.count, onSplit: onSplit, onSaveSplit: onSaveSplit)
+    }
+}
+
 private struct NavBarView: View {
     @ObservedObject var model: BrowserModel
     @ObservedObject var library: LibraryStore
     @ObservedObject var settings: AppSettingsStore
     @Binding var showPanel: Bool
     var urlFocused: FocusState<Bool>.Binding
+    let paneCount: Int
+    let onSplit: (Axis) -> Void
+    let onSaveSplit: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -382,6 +572,19 @@ private struct NavBarView: View {
                 }
             } else {
                 Button { model.webView?.reload() } label: { Image(systemName: "arrow.clockwise") }
+            }
+
+            // 分割メニュー（検索後に押すと現在のビューを分割。新ペインは検索画面）
+            Menu {
+                Button { onSplit(.horizontal) } label: { Label("左右に分割", systemImage: "rectangle.split.2x1") }
+                    .disabled(paneCount >= 4)
+                Button { onSplit(.vertical) } label: { Label("上下に分割", systemImage: "rectangle.split.1x2") }
+                    .disabled(paneCount >= 4)
+                if paneCount > 1 {
+                    Button { onSaveSplit() } label: { Label("この分割をホームに保存", systemImage: "pin") }
+                }
+            } label: {
+                Image(systemName: paneCount > 1 ? "rectangle.split.2x1.fill" : "rectangle.split.2x1")
             }
 
             if settings.showBookmarkButton {

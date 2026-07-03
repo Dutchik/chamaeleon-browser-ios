@@ -79,6 +79,11 @@ struct StartView: View {
                             launcher(title: s.name.isEmpty ? "分割" : s.name,
                                      icon: s.layout.systemImage,
                                      colors: [Color(white: 0.22), Color(white: 0.12)]) { onOpenSplit(s) }
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        splitStore.configs.removeAll { $0.id == s.id }
+                                    } label: { Label("削除", systemImage: "trash") }
+                                }
                         }
                         launcher(title: "新規分割", icon: "plus", colors: [Color(white: 0.18), Color(white: 0.1)],
                                  dashed: true) { onNewSplit() }
