@@ -1,0 +1,27 @@
+name: Chamaeleon
+options:
+  bundleIdPrefix: com.awokela
+  deploymentTarget:
+    iOS: "16.0"
+attributes:
+  LastUpgradeCheck: "9999"
+settings:
+  base:
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    GENERATE_INFOPLIST_FILE: YES
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1,2"
+    INFOPLIST_KEY_UILaunchScreen_Generation: YES
+targets:
+  Chamaeleon:
+    type: application
+    platform: iOS
+    scheme: {}
+    sources:
+      - path: Chamaeleon
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.awokela.chamaeleon.ios
+        PRODUCT_NAME: Chamaeleon
