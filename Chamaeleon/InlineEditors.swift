@@ -61,6 +61,10 @@ struct InlineStylePanel: View {
     @State private var patchName = "スタイル調整"
     @State private var collapsed = false
     @State private var picking = false
+    // かんたん編集（CSS不要）
+    @State private var edits: [String: String] = [:]
+    @State private var textColor: Color = .primary
+    @State private var bgColor: Color = .white
 
     private let quickProps = ["color", "background-color", "font-size", "display", "border-radius", "padding"]
     private var host: String { URL(string: model.currentURL)?.host ?? model.currentURL }
@@ -98,8 +102,37 @@ struct InlineStylePanel: View {
                         .padding(8).background(Color.secondary.opacity(0.08)).cornerRadius(8)
                     }
 
-                    // CSS 編集（入力で即プレビュー）
-                    Text("CSS（入力すると即プレビュー）").font(.system(size: 12)).foregroundColor(.secondary)
+                    // かんたん編集（CSSがわからなくてもボタンで）
+                    Text("かんたん編集（CSS不要）").font(.system(size: 12, weight: .semibold)).foregroundColor(.secondary)
+                    VStack(spacing: 8) {
+                        HStack(spacing: 14) {
+                            ColorPicker("文字色", selection: $textColor, supportsOpacity: false)
+                                .onChange(of: textColor) { c in setEdit("color", hex(c)) }
+                            ColorPicker("背景色", selection: $bgColor, supportsOpacity: false)
+                                .onChange(of: bgColor) { c in setEdit("background-color", hex(c)) }
+                        }.font(.system(size: 13))
+                        HStack(spacing: 8) {
+                            Text("文字").font(.system(size: 13))
+                            Button { bumpFont(-2) } label: { Image(systemName: "textformat.size.smaller") }.buttonStyle(.bordered)
+                            Button { bumpFont(2) } label: { Image(systemName: "textformat.size.larger") }.buttonStyle(.bordered)
+                            Button { toggleBold() } label: { Image(systemName: "bold") }
+                                .buttonStyle(.bordered).tint(edits["font-weight"] == "bold" ? .green : nil)
+                            Spacer()
+                        }
+                        HStack(spacing: 8) {
+                            Button(role: .destructive) { setEdit("display", "none") } label: {
+                                Label("隠す", systemImage: "eye.slash")
+                            }.buttonStyle(.bordered)
+                            Button { removeEdit("display") } label: { Label("表示", systemImage: "eye") }.buttonStyle(.bordered)
+                            Button { resetEdits() } label: { Text("リセット") }.buttonStyle(.bordered)
+                            Spacer()
+                        }.font(.system(size: 12))
+                    }
+                    .disabled(selector.isEmpty)
+                    .opacity(selector.isEmpty ? 0.4 : 1)
+
+                    // CSS 編集（詳細・入力で即プレビュー）
+                    Text("CSS（詳しい方向け・入力で即プレビュー）").font(.system(size: 12)).foregroundColor(.secondary)
                     TextEditor(text: $css)
                         .font(.system(size: 13, design: .monospaced))
                         .frame(height: 110)
@@ -134,6 +167,7 @@ struct InlineStylePanel: View {
         model.onInspected = { info in
             selector = info.selector
             styles = info.styles
+            edits = [:]     // 新しい要素なので簡単編集をリセット
             picking = false
             collapsed = false
             rebuild()
@@ -149,6 +183,38 @@ struct InlineStylePanel: View {
         } else if !css.contains(s) {
             css = "\(s) {\n  \n}\n" + css
         }
+        model.previewCss(css)
+    }
+
+    // MARK: - かんたん編集ヘルパ（editsからCSSを生成）
+
+    private func setEdit(_ k: String, _ v: String) { edits[k] = v; regen() }
+    private func removeEdit(_ k: String) { edits[k] = nil; regen() }
+    private func resetEdits() { edits = [:]; regen() }
+    private func toggleBold() {
+        if edits["font-weight"] == "bold" { removeEdit("font-weight") } else { setEdit("font-weight", "bold") }
+    }
+    private func bumpFont(_ d: Int) {
+        let raw = (edits["font-size"] ?? styles["font-size"] ?? "16")
+            .replacingOccurrences(of: "px", with: "").trimmingCharacters(in: .whitespaces)
+        let cur = Int(Double(raw) ?? 16)
+        setEdit("font-size", "\(max(6, cur + d))px")
+    }
+    private func hex(_ c: Color) -> String {
+        let u = UIColor(c)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        u.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return String(format: "#%02X%02X%02X", Int(r * 255), Int(g * 255), Int(b * 255))
+    }
+    /// editsから selector { ... } のCSSを生成してプレビュー
+    private func regen() {
+        let s = selector.trimmingCharacters(in: .whitespaces)
+        guard !s.isEmpty else { return }
+        let decls = edits.keys.sorted().map { k -> String in
+            let imp = (k == "display" || k == "font-weight") ? " !important" : ""
+            return "  \(k): \(edits[k]!)\(imp);"
+        }
+        css = "\(s) {\n" + decls.joined(separator: "\n") + "\n}"
         model.previewCss(css)
     }
 

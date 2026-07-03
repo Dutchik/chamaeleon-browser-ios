@@ -400,40 +400,66 @@ private struct DrawerView: View {
     let onHome: () -> Void
     let isRecording: Bool
 
+    @State private var expanded: Set<String> = ["ブラウズ", "自動化"]
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack { Text("🦎 Chamaeleon").font(.system(size: 18, weight: .heavy)); Spacer() }.padding(16)
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    row("house", "ホーム", onHome)
-                    row("rectangle.split.2x2", "分割ビュー（複数サイト）", onSplit)
-                    row("wand.and.stars", "自動化フロー", onFlows)
-                    row(isRecording ? "record.circle.fill" : "record.circle",
-                        isRecording ? "記録を停止" : "操作を記録", onRecord, tint: isRecording ? .red : nil)
-                    row("key.fill", "認証情報（端末内）", onCreds)
-                    row("paintbrush.pointed", "スタイル編集", onStyle)
-                    row("slider.horizontal.3", "サイト設定", onSite)
-                    row("paintpalette", "ホーム / 見た目の編集", onHomeSettings)
-                    row("books.vertical", "ブックマーク・履歴", onLibrary)
-                    Divider().padding(.vertical, 8)
-                    Text("検索エンジン").font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.secondary).padding(.horizontal, 16).padding(.top, 4)
-                    ForEach(settings.allEngines) { e in
-                        Button { settings.engineId = e.id } label: {
-                            HStack {
-                                Image(systemName: settings.engineId == e.id ? "largecircle.fill.circle" : "circle")
-                                    .foregroundColor(settings.engineId == e.id ? Color(hex: settings.accentHex) : .secondary)
-                                Text(e.name).foregroundColor(.primary)
-                                Spacer()
+                    category("ブラウズ", "safari") {
+                        row("house", "ホーム", onHome)
+                        row("rectangle.split.2x2", "分割ビュー（複数サイト）", onSplit)
+                        row("books.vertical", "ブックマーク・履歴", onLibrary)
+                    }
+                    category("自動化", "wand.and.stars") {
+                        row("list.bullet.rectangle", "自動化フロー", onFlows)
+                        row(isRecording ? "record.circle.fill" : "record.circle",
+                            isRecording ? "記録を停止" : "操作を記録", onRecord, tint: isRecording ? .red : nil)
+                        row("key.fill", "認証情報（端末内）", onCreds)
+                    }
+                    category("カスタマイズ", "paintbrush") {
+                        row("paintbrush.pointed", "スタイル編集", onStyle)
+                        row("slider.horizontal.3", "サイト設定", onSite)
+                        row("paintpalette", "ホーム / 見た目の編集", onHomeSettings)
+                    }
+                    category("検索エンジン", "magnifyingglass") {
+                        ForEach(settings.allEngines) { e in
+                            Button { settings.engineId = e.id } label: {
+                                HStack {
+                                    Image(systemName: settings.engineId == e.id ? "largecircle.fill.circle" : "circle")
+                                        .foregroundColor(settings.engineId == e.id ? Color(hex: settings.accentHex) : .secondary)
+                                    Text(e.name).foregroundColor(.primary)
+                                    Spacer()
+                                }
+                                .font(.system(size: 14)).padding(.horizontal, 28).padding(.vertical, 9)
                             }
-                            .font(.system(size: 14)).padding(.horizontal, 16).padding(.vertical, 9)
                         }
                     }
                 }
                 .padding(.vertical, 8)
             }
         }
+    }
+
+    @ViewBuilder
+    private func category<C: View>(_ title: String, _ icon: String, @ViewBuilder _ content: () -> C) -> some View {
+        let isOpen = expanded.contains(title)
+        Button {
+            withAnimation { if isOpen { expanded.remove(title) } else { expanded.insert(title) } }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon).frame(width: 24).foregroundColor(.secondary)
+                Text(title).font(.system(size: 13, weight: .bold)).foregroundColor(.secondary)
+                Spacer()
+                Image(systemName: isOpen ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 11, weight: .semibold)).foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 10)
+        }
+        if isOpen { content() }
+        Divider().padding(.leading, 16).opacity(0.5)
     }
 
     private func row(_ icon: String, _ label: String, _ action: @escaping () -> Void, tint: Color? = nil) -> some View {

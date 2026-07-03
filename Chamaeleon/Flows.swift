@@ -238,6 +238,7 @@ final class AppSettingsStore: ObservableObject {
     @Published var showEngineBar: Bool { didSet { d.set(showEngineBar, forKey: "chm_w_engine") } }
     @Published var showClock: Bool { didSet { d.set(showClock, forKey: "chm_w_clock") } }
     @Published var showMemo: Bool { didSet { d.set(showMemo, forKey: "chm_w_memo") } }
+    @Published var showCalendar: Bool { didSet { d.set(showCalendar, forKey: "chm_w_cal") } }
     @Published var memo: String { didSet { d.set(memo, forKey: "chm_memo") } }
     // ヘッダー
     @Published var showBookmarkButton: Bool { didSet { d.set(showBookmarkButton, forKey: "chm_h_bm") } }
@@ -258,6 +259,7 @@ final class AppSettingsStore: ObservableObject {
         showEngineBar = d.object(forKey: "chm_w_engine") as? Bool ?? true
         showClock = d.object(forKey: "chm_w_clock") as? Bool ?? false
         showMemo = d.object(forKey: "chm_w_memo") as? Bool ?? false
+        showCalendar = d.object(forKey: "chm_w_cal") as? Bool ?? false
         memo = d.string(forKey: "chm_memo") ?? ""
         showBookmarkButton = d.object(forKey: "chm_h_bm") as? Bool ?? true
         showChameleonBadge = d.object(forKey: "chm_h_badge") as? Bool ?? true

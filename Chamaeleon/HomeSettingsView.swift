@@ -103,6 +103,7 @@ struct HomeSettingsView: View {
 
                 Section("ウィジェット") {
                     Toggle("時計・日付", isOn: $settings.showClock)
+                    Toggle("カレンダー（日タップで履歴表示）", isOn: $settings.showCalendar)
                     Toggle("メモ", isOn: $settings.showMemo)
                     if settings.showMemo {
                         TextField("メモの内容", text: $settings.memo, axis: .vertical).lineLimit(2...5)

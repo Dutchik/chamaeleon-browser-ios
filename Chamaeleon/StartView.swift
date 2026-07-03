@@ -59,6 +59,12 @@ struct StartView: View {
                 }.padding(.horizontal, 16)
 
                 ScrollView {
+                    // カレンダー（日タップで履歴ポップアップ）
+                    if settings.showCalendar {
+                        CalendarWidget(library: library, accent: accent, onOpen: onSearch)
+                            .padding(.bottom, 4)
+                    }
+
                     // 自動化（固定フロー）
                     if !pinnedFlows.isEmpty {
                         sectionHeader("自動化")

@@ -18,6 +18,7 @@
 		9F60AFBE56472356BE1AC52B /* StartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEAF0272A211B254419A134C /* StartView.swift */; };
 		A20E7F615E12C9A69F5BC3CD /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDAA831A329E93EC2B1F7157 /* BrowserView.swift */; };
 		AC611DB15E68D62C10886D58 /* HomeExtras.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E4779EC0403DAA74E9248CB /* HomeExtras.swift */; };
+		BB2BB125B0BD854E0170DF54 /* CalendarWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9AA08EE2BE8FC41679EA8A /* CalendarWidget.swift */; };
 		CA3D8516F5C38242E1458E2B /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E780023D128EA391150AC23E /* LibraryView.swift */; };
 		EF8024589AEF48D973ACF5B4 /* SitePanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */; };
 		FE4C7156642D3D3FA2EC2154 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6844D9CDAE8B6AEC266DFCBD /* Assets.xcassets */; };
@@ -36,6 +37,7 @@
 		B2F461DC464DB648E236420F /* ChamaeleonApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChamaeleonApp.swift; sourceTree = "<group>"; };
 		B6CAEE319BD1915BE82F4880 /* Flows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Flows.swift; sourceTree = "<group>"; };
 		BEAF0272A211B254419A134C /* StartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartView.swift; sourceTree = "<group>"; };
+		CC9AA08EE2BE8FC41679EA8A /* CalendarWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarWidget.swift; sourceTree = "<group>"; };
 		DDAA831A329E93EC2B1F7157 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
 		E780023D128EA391150AC23E /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		EFF6B0836E900A30342E0501 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -48,6 +50,7 @@
 				6844D9CDAE8B6AEC266DFCBD /* Assets.xcassets */,
 				9DD2F935DF7A32E3804D4ECB /* AutomationViews.swift */,
 				DDAA831A329E93EC2B1F7157 /* BrowserView.swift */,
+				CC9AA08EE2BE8FC41679EA8A /* CalendarWidget.swift */,
 				B2F461DC464DB648E236420F /* ChamaeleonApp.swift */,
 				EFF6B0836E900A30342E0501 /* ContentView.swift */,
 				B6CAEE319BD1915BE82F4880 /* Flows.swift */,
@@ -151,6 +154,7 @@
 			files = (
 				08B5A099922BF433460C83FB /* AutomationViews.swift in Sources */,
 				A20E7F615E12C9A69F5BC3CD /* BrowserView.swift in Sources */,
+				BB2BB125B0BD854E0170DF54 /* CalendarWidget.swift in Sources */,
 				4417805D544535FA9509D33A /* ChamaeleonApp.swift in Sources */,
 				4039E4108CAFAA9E1DD5F5C4 /* ContentView.swift in Sources */,
 				058CA10E4972F6F87EB123C7 /* Flows.swift in Sources */,
