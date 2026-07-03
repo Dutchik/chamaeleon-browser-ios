@@ -14,6 +14,7 @@
 		4039E4108CAFAA9E1DD5F5C4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFF6B0836E900A30342E0501 /* ContentView.swift */; };
 		4417805D544535FA9509D33A /* ChamaeleonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F461DC464DB648E236420F /* ChamaeleonApp.swift */; };
 		4A7E30A3E3D7F3C4E482F45D /* HomeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2890385F303105C17FCFBEF5 /* HomeSettingsView.swift */; };
+		6901736BB7D8B3ABD9BB788E /* ChamaeleonAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F50170434CFF214B731F038 /* ChamaeleonAgent.swift */; };
 		6FEC22FB8B0B34C6C5B1F7E5 /* NetworkRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDC9A7690550BC02C5E3F26 /* NetworkRules.swift */; };
 		84208A03312190389505DA95 /* RightDock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B5C2BAFC628369A05ED7A02 /* RightDock.swift */; };
 		913C1DAC76D6F20FE4169A24 /* chm_rules.c in Sources */ = {isa = PBXBuildFile; fileRef = 59ECA3C858B8D87B046C102C /* chm_rules.c */; };
@@ -30,6 +31,7 @@
 /* Begin PBXFileReference section */
 		0801B4DA839C7757AA452DFA /* Chamaeleon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chamaeleon.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1E4779EC0403DAA74E9248CB /* HomeExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeExtras.swift; sourceTree = "<group>"; };
+		1F50170434CFF214B731F038 /* ChamaeleonAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChamaeleonAgent.swift; sourceTree = "<group>"; };
 		2890385F303105C17FCFBEF5 /* HomeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSettingsView.swift; sourceTree = "<group>"; };
 		3283656222EF55B7806D8598 /* chm_rules.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = chm_rules.h; sourceTree = "<group>"; };
 		3BA46549524CFDDEEC52A4D4 /* Chamaeleon-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Chamaeleon-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -61,6 +63,7 @@
 				DDAA831A329E93EC2B1F7157 /* BrowserView.swift */,
 				CC9AA08EE2BE8FC41679EA8A /* CalendarWidget.swift */,
 				3BA46549524CFDDEEC52A4D4 /* Chamaeleon-Bridging-Header.h */,
+				1F50170434CFF214B731F038 /* ChamaeleonAgent.swift */,
 				B2F461DC464DB648E236420F /* ChamaeleonApp.swift */,
 				59ECA3C858B8D87B046C102C /* chm_rules.c */,
 				3283656222EF55B7806D8598 /* chm_rules.h */,
@@ -169,6 +172,7 @@
 				F0050B0A267FD008E845DA80 /* BlockRulesView.swift in Sources */,
 				A20E7F615E12C9A69F5BC3CD /* BrowserView.swift in Sources */,
 				BB2BB125B0BD854E0170DF54 /* CalendarWidget.swift in Sources */,
+				6901736BB7D8B3ABD9BB788E /* ChamaeleonAgent.swift in Sources */,
 				4417805D544535FA9509D33A /* ChamaeleonApp.swift in Sources */,
 				4039E4108CAFAA9E1DD5F5C4 /* ContentView.swift in Sources */,
 				058CA10E4972F6F87EB123C7 /* Flows.swift in Sources */,

@@ -26,11 +26,13 @@ struct BrowserView: UIViewRepresentable {
         config.websiteDataStore = .default()
         config.userContentController.add(context.coordinator, name: "chm")
         if let list = netRules.compiledList { config.userContentController.add(list) }
+        config.userContentController.addUserScript(ChamaeleonAgent.makeUserScript(store.profiles))  // 常駐ルールエンジン
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         if #available(iOS 16.0, *) { webView.isFindInteractionEnabled = true }
         context.coordinator.appliedRuleVersion = netRules.version
+        context.coordinator.appliedProfileVersion = store.version
         model.webView = webView
         if let url = URL(string: model.urlString) {
             webView.load(URLRequest(url: url))
@@ -45,6 +47,14 @@ struct BrowserView: UIViewRepresentable {
             ucc.removeAllContentRuleLists()
             if let list = netRules.compiledList { ucc.add(list) }
         }
+        // プロファイル（CSS/DOM/JS）が変わったら Agent を再ビルドして現ページにも即反映
+        if context.coordinator.appliedProfileVersion != store.version {
+            context.coordinator.appliedProfileVersion = store.version
+            let ucc = webView.configuration.userContentController
+            ucc.removeAllUserScripts()
+            ucc.addUserScript(ChamaeleonAgent.makeUserScript(store.profiles))
+            webView.evaluateJavaScript(ChamaeleonAgent.applyNowSource(store.profiles))
+        }
     }
     func makeCoordinator() -> Coordinator { Coordinator(model: model, store: store, netRules: netRules, onVisit: onVisit) }
 
@@ -54,6 +64,7 @@ struct BrowserView: UIViewRepresentable {
         let netRules: NetRuleStore
         let onVisit: ((String, String) -> Void)?
         var appliedRuleVersion = -1
+        var appliedProfileVersion = -1
         init(model: BrowserModel, store: ProfileStore, netRules: NetRuleStore, onVisit: ((String, String) -> Void)?) {
             self.model = model; self.store = store; self.netRules = netRules; self.onVisit = onVisit
         }
@@ -80,8 +91,8 @@ struct BrowserView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
             let url = webView.url?.absoluteString ?? ""
             Task { @MainActor in
+                // CSS/DOM/JSの適用は documentStart 常駐 Agent（ChamaeleonAgent）が担当。
                 model.currentURL = url; model.urlInput = url; model.urlString = url
-                PatchEngine.apply(profiles: store.matched(for: url), stage: .documentStart, to: webView)
             }
         }
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -91,13 +102,8 @@ struct BrowserView: UIViewRepresentable {
                 model.canGoBack = webView.canGoBack; model.canGoForward = webView.canGoForward
                 model.isLoading = false
                 onVisit?(url, webView.title ?? "")
-                let matched = store.matched(for: url)
-                model.matchedCount = matched.count
-                PatchEngine.apply(profiles: matched, stage: .documentEnd, to: webView)
+                model.matchedCount = store.matched(for: url).count
                 if model.recording { model.injectRecorder() }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    PatchEngine.apply(profiles: matched, stage: .idle, to: webView)
-                }
                 model.finishNav()
             }
         }

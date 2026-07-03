@@ -112,8 +112,10 @@ struct SiteProfile: Codable, Identifiable, Equatable {
 @MainActor
 final class ProfileStore: ObservableObject {
     @Published var profiles: [SiteProfile] = [] {
-        didSet { save() }
+        didSet { save(); version &+= 1 }
     }
+    /// ルール変更検知用（Agent再ビルドのトリガ）
+    @Published private(set) var version = 0
 
     private var fileURL: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
