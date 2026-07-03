@@ -3,10 +3,19 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var store = ProfileStore()
     @StateObject private var library = LibraryStore()
+    @StateObject private var flowStore = FlowStore()
+    @StateObject private var credStore = CredentialStore()
+    @StateObject private var settings = AppSettingsStore()
+
     @State private var tabs: [BrowserModel] = []
     @State private var activeIndex = 0
     @State private var showPanel = false
     @State private var showLibrary = false
+    @State private var showDrawer = false
+    @State private var showFlows = false
+    @State private var showCreds = false
+    @State private var showStyle = false
+    @State private var flowStatus: String?
     @FocusState private var urlFocused: Bool
 
     private var active: BrowserModel? {
@@ -14,57 +23,142 @@ struct ContentView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            tabBar
-            navBar
-            Divider()
-            // 各タブのWKWebViewは生かしたまま、アクティブのみ表示
-            ZStack {
-                ForEach(Array(tabs.enumerated()), id: \.element.id) { index, model in
+        ZStack(alignment: .leading) {
+            VStack(spacing: 0) {
+                tabBar
+                navBar
+                flowHeader
+                Divider()
+                content
+            }
+
+            // 左ハンバーガードロワー
+            if showDrawer {
+                Color.black.opacity(0.35).ignoresSafeArea()
+                    .onTapGesture { withAnimation { showDrawer = false } }
+                DrawerView(
+                    library: library, settings: settings,
+                    onFlows: { showDrawer = false; showFlows = true },
+                    onCreds: { showDrawer = false; showCreds = true },
+                    onStyle: { showDrawer = false; showStyle = true },
+                    onSite: { showDrawer = false; showPanel = true },
+                    onLibrary: { showDrawer = false; showLibrary = true },
+                    onRecord: { showDrawer = false; toggleRecord() },
+                    onHome: { showDrawer = false; active?.goHome() },
+                    isRecording: active?.recording ?? false
+                )
+                .frame(width: 290).frame(maxHeight: .infinity)
+                .background(Color(uiColor: .systemBackground))
+                .transition(.move(edge: .leading))
+            }
+        }
+        .onAppear {
+            if tabs.isEmpty { tabs = [BrowserModel(home: true)] }
+        }
+        .sheet(isPresented: $showPanel) { if let m = active { SitePanelView(store: store, model: m) } }
+        .sheet(isPresented: $showLibrary) { if let m = active { LibraryView(library: library, model: m) } }
+        .sheet(isPresented: $showFlows) { if let m = active { FlowListView(flowStore: flowStore, credStore: credStore, model: m) } }
+        .sheet(isPresented: $showCreds) { CredentialsView(store: credStore) }
+        .sheet(isPresented: $showStyle) { if let m = active { StyleEditorView(store: store, model: m) } }
+    }
+
+    // MARK: - コンテンツ（ホーム or WebView）
+
+    private var content: some View {
+        ZStack {
+            ForEach(Array(tabs.enumerated()), id: \.element.id) { index, model in
+                ZStack {
                     BrowserView(model: model, store: store) { url, title in
                         library.recordVisit(url: url, title: title)
                     }
-                    .opacity(index == activeIndex ? 1 : 0)
-                    .allowsHitTesting(index == activeIndex)
+                    if model.isHome {
+                        StartView(settings: settings, library: library) { target in
+                            model.navigate(target)
+                        }
+                    }
                 }
-            }
-            .ignoresSafeArea(edges: .bottom)
-        }
-        .onAppear {
-            if tabs.isEmpty { tabs = [BrowserModel(url: library.homepage)] }
-        }
-        .sheet(isPresented: $showPanel) {
-            if let model = active {
-                SitePanelView(store: store, model: model)
+                .opacity(index == activeIndex ? 1 : 0)
+                .allowsHitTesting(index == activeIndex)
             }
         }
-        .sheet(isPresented: $showLibrary) {
-            if let model = active {
-                LibraryView(library: library, model: model)
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    // MARK: - フロー実行ヘッダー（マッチしたページで表示）
+
+    @ViewBuilder
+    private var flowHeader: some View {
+        if let model = active, !model.isHome {
+            let matched = flowStore.matched(for: model.currentURL)
+            if !matched.isEmpty || flowStatus != nil {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        if let s = flowStatus {
+                            Text(s).font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary).lineLimit(1)
+                        }
+                        ForEach(matched) { flow in
+                            Button {
+                                runFlow(flow, model: model)
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "play.fill").font(.system(size: 10))
+                                    Text(flow.name).font(.system(size: 12, weight: .semibold))
+                                }
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .background(Color.green.opacity(0.15))
+                                .foregroundColor(.green)
+                                .clipShape(Capsule())
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                }
+                .background(Color(uiColor: .secondarySystemBackground))
             }
         }
     }
 
-    // MARK: - タブバー（仕様§4.1）
+    private func runFlow(_ flow: Flow, model: BrowserModel) {
+        Task {
+            await FlowRunner.run(flow, model: model, creds: credStore) { s in flowStatus = s }
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            flowStatus = nil
+        }
+    }
+
+    private func toggleRecord() {
+        guard let m = active else { return }
+        if m.recording { m.stopRecording() } else { m.startRecording() }
+    }
+
+    // MARK: - タブバー
 
     private var tabBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(Array(tabs.enumerated()), id: \.element.id) { index, model in
-                    TabChip(model: model, isActive: index == activeIndex,
-                            showClose: tabs.count > 1,
-                            onSelect: { activeIndex = index },
-                            onClose: { closeTab(at: index) })
-                }
-                Button {
-                    tabs.append(BrowserModel(url: library.homepage))
-                    activeIndex = tabs.count - 1
-                } label: {
-                    Image(systemName: "plus").font(.system(size: 13, weight: .bold))
-                }
-                .padding(.horizontal, 8)
+        HStack(spacing: 6) {
+            Button { withAnimation { showDrawer.toggle() } } label: {
+                Image(systemName: "line.3.horizontal").font(.system(size: 16, weight: .semibold))
             }
-            .padding(.horizontal, 10).padding(.vertical, 5)
+            .padding(.leading, 10)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Array(tabs.enumerated()), id: \.element.id) { index, model in
+                        TabChip(model: model, isActive: index == activeIndex,
+                                showClose: tabs.count > 1,
+                                onSelect: { activeIndex = index },
+                                onClose: { closeTab(at: index) })
+                    }
+                    Button {
+                        tabs.append(BrowserModel(home: true))
+                        activeIndex = tabs.count - 1
+                    } label: {
+                        Image(systemName: "plus").font(.system(size: 13, weight: .bold))
+                    }
+                    .padding(.horizontal, 8)
+                }
+                .padding(.vertical, 5)
+            }
         }
         .background(Color(uiColor: .systemBackground))
     }
@@ -72,7 +166,7 @@ struct ContentView: View {
     private func closeTab(at index: Int) {
         tabs.remove(at: index)
         if tabs.isEmpty {
-            tabs = [BrowserModel(url: library.homepage)]
+            tabs = [BrowserModel(home: true)]
             activeIndex = 0
         } else if activeIndex >= tabs.count {
             activeIndex = tabs.count - 1
@@ -85,8 +179,71 @@ struct ContentView: View {
     private var navBar: some View {
         if let model = active {
             NavBarView(model: model, library: library,
-                       showPanel: $showPanel, showLibrary: $showLibrary,
+                       showPanel: $showPanel, showStyle: $showStyle,
                        urlFocused: $urlFocused)
+        }
+    }
+}
+
+/// 左ドロワー（ハンバーガーメニュー）
+private struct DrawerView: View {
+    @ObservedObject var library: LibraryStore
+    @ObservedObject var settings: AppSettingsStore
+    let onFlows: () -> Void
+    let onCreds: () -> Void
+    let onStyle: () -> Void
+    let onSite: () -> Void
+    let onLibrary: () -> Void
+    let onRecord: () -> Void
+    let onHome: () -> Void
+    let isRecording: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("🦎 Chamaeleon").font(.system(size: 18, weight: .heavy))
+                Spacer()
+            }
+            .padding(16)
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    row("house", "ホーム", onHome)
+                    row("wand.and.stars", "自動化フロー", onFlows)
+                    row(isRecording ? "record.circle.fill" : "record.circle",
+                        isRecording ? "記録を停止" : "操作を記録", onRecord, tint: isRecording ? .red : nil)
+                    row("key.fill", "認証情報（端末内）", onCreds)
+                    row("paintbrush.pointed", "スタイル編集", onStyle)
+                    row("slider.horizontal.3", "サイト設定", onSite)
+                    row("books.vertical", "ブックマーク・履歴", onLibrary)
+                    Divider().padding(.vertical, 8)
+                    Text("検索エンジン").font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary).padding(.horizontal, 16).padding(.top, 4)
+                    ForEach(DEFAULT_ENGINES) { e in
+                        Button { settings.engineId = e.id } label: {
+                            HStack {
+                                Image(systemName: settings.engineId == e.id ? "largecircle.fill.circle" : "circle")
+                                    .foregroundColor(settings.engineId == e.id ? .green : .secondary)
+                                Text(e.name).foregroundColor(.primary)
+                                Spacer()
+                            }
+                            .font(.system(size: 14)).padding(.horizontal, 16).padding(.vertical, 9)
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+        }
+    }
+
+    private func row(_ icon: String, _ label: String, _ action: @escaping () -> Void, tint: Color? = nil) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon).frame(width: 24).foregroundColor(tint ?? .accentColor)
+                Text(label).foregroundColor(.primary)
+                Spacer()
+            }
+            .font(.system(size: 15)).padding(.horizontal, 16).padding(.vertical, 11)
         }
     }
 }
@@ -101,7 +258,7 @@ private struct TabChip: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Text(model.title.isEmpty ? "New Tab" : model.title)
+            Text(model.isHome ? "ホーム" : (model.title.isEmpty ? "New Tab" : model.title))
                 .font(.system(size: 12, weight: isActive ? .bold : .regular))
                 .lineLimit(1)
                 .frame(maxWidth: 120)
@@ -125,7 +282,7 @@ private struct NavBarView: View {
     @ObservedObject var model: BrowserModel
     @ObservedObject var library: LibraryStore
     @Binding var showPanel: Bool
-    @Binding var showLibrary: Bool
+    @Binding var showStyle: Bool
     var urlFocused: FocusState<Bool>.Binding
 
     var body: some View {
@@ -146,7 +303,6 @@ private struct NavBarView: View {
                     urlFocused.wrappedValue = false
                 }
 
-            // 読み込み中は停止、それ以外は更新（仕様§4.1）
             if model.isLoading {
                 Button { model.webView?.stopLoading(); model.isLoading = false } label: {
                     Image(systemName: "xmark")
@@ -155,16 +311,12 @@ private struct NavBarView: View {
                 Button { model.webView?.reload() } label: { Image(systemName: "arrow.clockwise") }
             }
 
-            // ブックマーク
             Button {
                 library.toggleBookmark(url: model.currentURL, title: model.title)
             } label: {
                 Image(systemName: library.isBookmarked(model.currentURL) ? "star.fill" : "star")
                     .foregroundColor(library.isBookmarked(model.currentURL) ? .yellow : .accentColor)
             }
-
-            // ライブラリ（ブックマーク・履歴・設定）
-            Button { showLibrary = true } label: { Image(systemName: "books.vertical") }
 
             // カメレオンバッジ: 適用中プロファイル数 → Site Panel
             Button { showPanel = true } label: {
