@@ -14,6 +14,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     TARGETED_DEVICE_FAMILY: "1,2"
     INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: "ダウンロードした画像・動画を写真ライブラリに保存します。"
 targets:
   Chamaeleon:
     type: application

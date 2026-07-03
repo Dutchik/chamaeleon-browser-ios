@@ -247,6 +247,26 @@ final class BrowserModel: ObservableObject, Identifiable {
     }
     func clearPreview() { webView?.evaluateJavaScript("document.getElementById('chm-style-preview')?.remove();") }
 
+    /// 現在ページ(レンダリング済みDOM)の全要素からリソースURLを収集
+    func collectResources() async -> [String] {
+        guard let wv = webView else { return [] }
+        let js = """
+        JSON.stringify([...document.querySelectorAll('img,video,source,audio,a,link,script,[style]')].flatMap(function(e){
+          var o=[]; if(e.currentSrc)o.push(e.currentSrc); if(e.src)o.push(e.src); if(e.href)o.push(e.href);
+          if(e.srcset)e.srcset.split(',').forEach(function(s){o.push(s.trim().split(' ')[0]);});
+          var bg=(e.style&&e.style.backgroundImage)||''; var m=bg.match(/url\\((['"]?)(.*?)\\1\\)/); if(m)o.push(m[2]);
+          return o;
+        }).filter(Boolean))
+        """
+        return await withCheckedContinuation { (c: CheckedContinuation<[String], Never>) in
+            wv.evaluateJavaScript(js) { result, _ in
+                guard let s = result as? String, let d = s.data(using: .utf8),
+                      let arr = try? JSONDecoder().decode([String].self, from: d) else { c.resume(returning: []); return }
+                c.resume(returning: arr)
+            }
+        }
+    }
+
     // MARK: - フローの1ステップ実行（callAsyncJavaScriptでPromiseをawait）
 
     func runStep(type: String, selector: String?, value: String?, timeoutMs: Int) async -> Bool {

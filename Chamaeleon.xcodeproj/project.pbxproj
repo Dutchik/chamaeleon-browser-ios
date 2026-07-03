@@ -11,6 +11,7 @@
 		085496E0265E938FA1D5996B /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 534865698659E829E6586B49 /* Models.swift */; };
 		08B5A099922BF433460C83FB /* AutomationViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD2F935DF7A32E3804D4ECB /* AutomationViews.swift */; };
 		1767A28ED74EF4070C26AC5C /* InlineEditors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990A3786A5DA6ECF1C451A2B /* InlineEditors.swift */; };
+		298FA1C0E5494CAFCF84D487 /* Downloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E8B43B0467330126C1F46C /* Downloader.swift */; };
 		4039E4108CAFAA9E1DD5F5C4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFF6B0836E900A30342E0501 /* ContentView.swift */; };
 		4417805D544535FA9509D33A /* ChamaeleonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F461DC464DB648E236420F /* ChamaeleonApp.swift */; };
 		4A7E30A3E3D7F3C4E482F45D /* HomeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2890385F303105C17FCFBEF5 /* HomeSettingsView.swift */; };
@@ -29,7 +30,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		0801B4DA839C7757AA452DFA /* Chamaeleon.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Chamaeleon.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0801B4DA839C7757AA452DFA /* Chamaeleon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chamaeleon.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1E4779EC0403DAA74E9248CB /* HomeExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeExtras.swift; sourceTree = "<group>"; };
 		1F50170434CFF214B731F038 /* ChamaeleonAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChamaeleonAgent.swift; sourceTree = "<group>"; };
 		2890385F303105C17FCFBEF5 /* HomeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSettingsView.swift; sourceTree = "<group>"; };
@@ -39,6 +40,7 @@
 		4B5C2BAFC628369A05ED7A02 /* RightDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RightDock.swift; sourceTree = "<group>"; };
 		534865698659E829E6586B49 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		59ECA3C858B8D87B046C102C /* chm_rules.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = chm_rules.c; sourceTree = "<group>"; };
+		65E8B43B0467330126C1F46C /* Downloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Downloader.swift; sourceTree = "<group>"; };
 		6844D9CDAE8B6AEC266DFCBD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		990A3786A5DA6ECF1C451A2B /* InlineEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineEditors.swift; sourceTree = "<group>"; };
 		9DD2F935DF7A32E3804D4ECB /* AutomationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationViews.swift; sourceTree = "<group>"; };
@@ -68,6 +70,7 @@
 				59ECA3C858B8D87B046C102C /* chm_rules.c */,
 				3283656222EF55B7806D8598 /* chm_rules.h */,
 				EFF6B0836E900A30342E0501 /* ContentView.swift */,
+				65E8B43B0467330126C1F46C /* Downloader.swift */,
 				B6CAEE319BD1915BE82F4880 /* Flows.swift */,
 				1E4779EC0403DAA74E9248CB /* HomeExtras.swift */,
 				2890385F303105C17FCFBEF5 /* HomeSettingsView.swift */,
@@ -175,6 +178,7 @@
 				6901736BB7D8B3ABD9BB788E /* ChamaeleonAgent.swift in Sources */,
 				4417805D544535FA9509D33A /* ChamaeleonApp.swift in Sources */,
 				4039E4108CAFAA9E1DD5F5C4 /* ContentView.swift in Sources */,
+				298FA1C0E5494CAFCF84D487 /* Downloader.swift in Sources */,
 				058CA10E4972F6F87EB123C7 /* Flows.swift in Sources */,
 				AC611DB15E68D62C10886D58 /* HomeExtras.swift in Sources */,
 				4A7E30A3E3D7F3C4E482F45D /* HomeSettingsView.swift in Sources */,
@@ -198,7 +202,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = YES;
-				DEVELOPMENT_TEAM = 6683JSPB7Y;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -219,7 +222,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = YES;
-				DEVELOPMENT_TEAM = 6683JSPB7Y;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -282,6 +284,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "ダウンロードした画像・動画を写真ライブラリに保存します。";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 0.2.0;
@@ -350,6 +353,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "ダウンロードした画像・動画を写真ライブラリに保存します。";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 0.2.0;

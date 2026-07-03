@@ -19,6 +19,7 @@ struct ContentView: View {
     @StateObject private var settings = AppSettingsStore()
     @StateObject private var splitStore = SplitStore()
     @StateObject private var netRules = NetRuleStore()
+    @StateObject private var downloadManager = DownloadManager()
     @StateObject private var recordSession = RecordSession()
 
     @State private var tabs: [BrowserTab] = []
@@ -30,6 +31,7 @@ struct ContentView: View {
     @State private var showCreds = false
     @State private var showHomeSettings = false
     @State private var showBlock = false
+    @State private var showDownloader = false
     @State private var editor: InlineEditor = .none      // 下部スタイル編集パネル
     @State private var dockExpanded = false              // 右ドックの展開状態
     @State private var wizardFlow: Flow?
@@ -73,6 +75,7 @@ struct ContentView: View {
                     onSplit: { showDrawer = false; splitTab(.horizontal) },
                     onHomeSettings: { showDrawer = false; showHomeSettings = true },
                     onBlock: { showDrawer = false; showBlock = true },
+                    onDownload: { showDrawer = false; showDownloader = true },
                     onHome: { showDrawer = false; active?.goHome() },
                     isRecording: recordSession.active
                 )
@@ -116,6 +119,7 @@ struct ContentView: View {
         .sheet(isPresented: $showFlows) { if let m = active { FlowListView(flowStore: flowStore, credStore: credStore, model: m) } }
         .sheet(isPresented: $showCreds) { CredentialsView(store: credStore) }
         .sheet(isPresented: $showBlock) { if let m = active { BlockRulesView(netRules: netRules, model: m, accent: accent) } }
+        .sheet(isPresented: $showDownloader) { if let m = active { DownloaderView(manager: downloadManager, model: m, accent: accent) } }
         .sheet(item: $wizardFlow) { f in
             if let m = active { FlowWizardView(flowStore: flowStore, credStore: credStore, model: m, editing: f) }
         }
@@ -416,6 +420,7 @@ private struct DrawerView: View {
     let onSplit: () -> Void
     let onHomeSettings: () -> Void
     let onBlock: () -> Void
+    let onDownload: () -> Void
     let onHome: () -> Void
     let isRecording: Bool
 
@@ -430,6 +435,7 @@ private struct DrawerView: View {
                     category("ブラウズ", "safari") {
                         row("house", "ホーム", onHome)
                         row("rectangle.split.2x2", "分割ビュー（複数サイト）", onSplit)
+                        row("arrow.down.circle", "一括ダウンロード", onDownload)
                         row("books.vertical", "ブックマーク・履歴", onLibrary)
                     }
                     category("自動化", "wand.and.stars") {
