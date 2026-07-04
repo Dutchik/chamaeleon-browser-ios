@@ -51,7 +51,11 @@ static int ct_is_media(const char *hdr) {
             const char *v = p + 13; while (*v == ' ') v++;
             if (strncasecmp(v, "image/", 6) == 0 || strncasecmp(v, "video/", 6) == 0 ||
                 strncasecmp(v, "audio/", 6) == 0 || strncasecmp(v, "application/pdf", 15) == 0 ||
-                strncasecmp(v, "application/octet-stream", 24) == 0) return 1;
+                strncasecmp(v, "application/octet-stream", 24) == 0 ||
+                strncasecmp(v, "application/mp4", 15) == 0 ||
+                strncasecmp(v, "application/vnd.apple.mpegurl", 29) == 0 ||
+                strncasecmp(v, "application/x-mpegurl", 21) == 0 ||
+                strncasecmp(v, "application/dash+xml", 20) == 0) return 1;   // HLS/DASH/セグメント
             return 0;
         }
         p++;
@@ -78,6 +82,23 @@ static const char *ct_ext(const char *hdr) {
         p++;
     }
     return "bin";
+}
+
+// chunked ボディをデコード。complete=1 で終端(0チャンク)到達。呼び出し側free。
+static char *dechunk(const char *b, long n, long *outlen, int *complete) {
+    char *out = (char *)malloc(n > 0 ? n : 1);
+    long o = 0, i = 0; *complete = 0;
+    while (i < n) {
+        long j = i; while (j < n && b[j] != '\r') j++;
+        if (j + 1 >= n) break;                 // サイズ行が未完
+        long sz = strtol(b + i, NULL, 16);
+        long dstart = j + 2;                   // "\r\n" を飛ばす
+        if (sz == 0) { *complete = 1; break; } // 終端チャンク
+        if (dstart + sz + 2 > n) break;        // データが未着
+        memcpy(out + o, b + dstart, sz); o += sz;
+        i = dstart + sz + 2;                   // データ + "\r\n"
+    }
+    *outlen = o; return out;
 }
 
 // 応答がメディアならボディをキャプチャ保存
@@ -330,8 +351,23 @@ static void handle_http80(int cfd, int ofd) {
     int chunked = header_has(res, "transfer-encoding:", "chunked");
     res[she] = save;
 
+    if (chunked && g_capture) {
+        // chunked メディア: 全応答をバッファして「生のまま転送」しつつ、デコードしてキャプチャ
+        long scap = stot + 1;
+        for (;;) {
+            int done; long plen;
+            char *pl = dechunk(res + she, stot - she, &plen, &done);
+            if (done) { chm_proxy_capture_if_media(res, she, pl, plen, urlhint); free(pl); break; }
+            free(pl);
+            if (stot + 1 >= scap) { scap *= 2; char *nb = realloc(res, scap); if (!nb) break; res = nb; }
+            ssize_t r = recv(ofd, res + stot, (size_t)(scap - stot - 1), 0);
+            if (r <= 0) break; stot += r;
+        }
+        send_all(cfd, res, stot); add_bytes(stot); free(res);
+        return;
+    }
     if (chunked || cl < 0) {
-        // 書換非対応 → そのまま流してトンネル継続
+        // 書換/キャプチャ非対応 → そのまま流してトンネル継続
         send_all(cfd, res, stot); add_bytes(stot); free(res);
         pump(cfd, ofd); return;
     }
