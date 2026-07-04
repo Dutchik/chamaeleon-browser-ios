@@ -38,6 +38,14 @@ int  chm_proxy_capture_count(void);      // 保存したメディア数（検証
 void chm_proxy_capture_if_media(const char *header, long headerlen,
                                 const char *body, long bodylen, const char *url_hint);
 
+// キャプチャセッション: 「開始」から「停止」までに流れたメディアを収集し、
+// 同一ストリーム（URLのディレクトリが同じセグメント群）を到着順に1ファイルへ結合する。
+void chm_proxy_session_start(const char *dir);  // dir に出力してグループ化開始
+void chm_proxy_session_stop(void);              // 全ストリームを確定（ファイルclose）
+int  chm_proxy_session_active(void);
+int  chm_proxy_session_streams(void);           // 収集したストリーム/ファイル数
+long chm_proxy_session_bytes(void);             // セッションで書き出した総バイト
+
 #ifdef __cplusplus
 }
 #endif

@@ -101,10 +101,82 @@ static char *dechunk(const char *b, long n, long *outlen, int *complete) {
     *outlen = o; return out;
 }
 
+// ---- キャプチャセッション（同一ストリームを結合） ----
+static int  g_session = 0;
+static char g_sessdir[1024] = {0};
+static long g_sessbytes = 0;
+typedef struct chm_stream { char *key; FILE *f; char *path; struct chm_stream *next; } chm_stream;
+static chm_stream *g_streams = NULL;
+static int g_stream_count = 0;
+
+void chm_proxy_session_start(const char *dir) {
+    pthread_mutex_lock(&g_lock);
+    if (dir) snprintf(g_sessdir, sizeof(g_sessdir), "%s", dir);
+    // 既存ストリームを閉じる
+    for (chm_stream *s = g_streams; s;) { chm_stream *n = s->next; if (s->f) fclose(s->f); free(s->key); free(s->path); free(s); s = n; }
+    g_streams = NULL; g_stream_count = 0; g_sessbytes = 0; g_session = 1;
+    pthread_mutex_unlock(&g_lock);
+}
+void chm_proxy_session_stop(void) {
+    pthread_mutex_lock(&g_lock);
+    g_session = 0;
+    for (chm_stream *s = g_streams; s; s = s->next) { if (s->f) { fclose(s->f); s->f = NULL; } }
+    pthread_mutex_unlock(&g_lock);
+}
+int  chm_proxy_session_active(void) { return g_session; }
+int  chm_proxy_session_streams(void) { pthread_mutex_lock(&g_lock); int c = g_stream_count; pthread_mutex_unlock(&g_lock); return c; }
+long chm_proxy_session_bytes(void) { pthread_mutex_lock(&g_lock); long b = g_sessbytes; pthread_mutex_unlock(&g_lock); return b; }
+
+static void sanitize(char *s) { for (; *s; s++) if (*s == '/' || *s == ':' || *s == '?' || *s == '#' || *s == '&' || *s == '=' || *s == ' ') *s = '_'; }
+
+// url_hint と拡張子から「ストリームキー(=ディレクトリ)」とファイル名を決めて追記（要ロック済）
+static void session_append(const char *url_hint, const char *ext, const char *body, long bodylen) {
+    // キー: URLのディレクトリ部（最後の '/' より前）＋クエリ除去。同キーは同一ファイルに結合。
+    char key[600] = {0};
+    if (url_hint && *url_hint) {
+        snprintf(key, sizeof(key), "%s", url_hint);
+        char *q = strpbrk(key, "?#"); if (q) *q = 0;
+        char *slash = strrchr(key, '/'); if (slash) *slash = 0;   // ディレクトリまで
+    }
+    if (!key[0]) snprintf(key, sizeof(key), "single");
+
+    int isSeg = (strcmp(ext, "ts") == 0 || strcmp(ext, "m4s") == 0 || strcmp(ext, "mp4") == 0 ||
+                 strcmp(ext, "m4a") == 0 || strcmp(ext, "aac") == 0 || strcmp(ext, "bin") == 0);
+    if (!isSeg) {
+        // 単体メディア（画像等）は個別ファイル
+        long idx = ++g_capcount;
+        char base[300] = {0};
+        const char *nm = url_hint ? (strrchr(url_hint, '/') ? strrchr(url_hint, '/') + 1 : url_hint) : "";
+        snprintf(base, sizeof(base), "%.200s", nm); char *q = strpbrk(base, "?#"); if (q) *q = 0;
+        char path[1400];
+        if (base[0] && strchr(base, '.')) snprintf(path, sizeof(path), "%s/%ld_%s", g_sessdir, idx, base);
+        else snprintf(path, sizeof(path), "%s/%ld.%s", g_sessdir, idx, ext);
+        FILE *f = fopen(path, "wb"); if (f) { fwrite(body, 1, (size_t)bodylen, f); fclose(f); g_sessbytes += bodylen; }
+        return;
+    }
+    // セグメント → 同キーのストリームに追記
+    for (chm_stream *s = g_streams; s; s = s->next) {
+        if (strcmp(s->key, key) == 0) {
+            if (s->f) { fwrite(body, 1, (size_t)bodylen, s->f); fflush(s->f); g_sessbytes += bodylen; }
+            return;
+        }
+    }
+    // 新規ストリーム
+    chm_stream *s = (chm_stream *)malloc(sizeof(chm_stream));
+    s->key = strdup(key);
+    char fname[620]; snprintf(fname, sizeof(fname), "%s", key); sanitize(fname);
+    char path[1400]; snprintf(path, sizeof(path), "%s/stream_%d_%.200s.%s", g_sessdir, g_stream_count + 1, fname, ext);
+    s->path = strdup(path);
+    s->f = fopen(path, "wb");
+    s->next = g_streams; g_streams = s; g_stream_count++;
+    if (s->f) { fwrite(body, 1, (size_t)bodylen, s->f); fflush(s->f); g_sessbytes += bodylen; }
+}
+
 // 応答がメディアならボディをキャプチャ保存
 void chm_proxy_capture_if_media(const char *header, long headerlen,
                                 const char *body, long bodylen, const char *url_hint) {
-    if (!g_capture || !g_capdir[0] || bodylen <= 0) return;
+    if (!g_capture || bodylen <= 0) return;
+    if (!g_session && !g_capdir[0]) return;
     char *hdr = (char *)malloc(headerlen + 1);
     if (!hdr) return;
     memcpy(hdr, header, headerlen); hdr[headerlen] = 0;
@@ -113,10 +185,26 @@ void chm_proxy_capture_if_media(const char *header, long headerlen,
     free(hdr);
     if (!media) return;
 
-    long idx;
-    pthread_mutex_lock(&g_lock); idx = ++g_capcount; pthread_mutex_unlock(&g_lock);
+    // 拡張子: URL末尾が既知のセグメント拡張子ならそれを優先
+    char uext[8] = {0};
+    if (url_hint) {
+        const char *dot = strrchr(url_hint, '.');
+        if (dot) { int k = 0; for (int m = 1; dot[m] && dot[m] != '?' && dot[m] != '#' && k < 6; m++) uext[k++] = (char)tolower((unsigned char)dot[m]); uext[k] = 0; }
+    }
+    const char *useExt = ext;
+    if (!strcmp(uext, "ts") || !strcmp(uext, "m4s") || !strcmp(uext, "mp4") || !strcmp(uext, "m4a") ||
+        !strcmp(uext, "aac") || !strcmp(uext, "webm") || !strcmp(uext, "m3u8")) useExt = uext;
 
-    // ファイル名: url_hint の末尾 + 連番、無ければ連番のみ
+    // セッション中はストリーム結合、そうでなければ個別保存
+    pthread_mutex_lock(&g_lock);
+    if (g_session) {
+        session_append(url_hint, useExt, body, bodylen);
+        pthread_mutex_unlock(&g_lock);
+        return;
+    }
+    long idx = ++g_capcount;
+    pthread_mutex_unlock(&g_lock);
+
     char base[256] = {0};
     if (url_hint) {
         const char *slash = strrchr(url_hint, '/');
@@ -130,7 +218,7 @@ void chm_proxy_capture_if_media(const char *header, long headerlen,
     }
     char path[1400];
     if (base[0] && strchr(base, '.')) snprintf(path, sizeof(path), "%s/%ld_%s", g_capdir, idx, base);
-    else snprintf(path, sizeof(path), "%s/%ld_capture.%s", g_capdir, idx, ext);
+    else snprintf(path, sizeof(path), "%s/%ld_capture.%s", g_capdir, idx, useExt);
 
     FILE *f = fopen(path, "wb");
     if (f) { fwrite(body, 1, (size_t)bodylen, f); fclose(f); }

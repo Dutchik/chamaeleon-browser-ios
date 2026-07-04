@@ -32,6 +32,17 @@ struct BlockRulesView: View {
                         .font(.system(size: 11)).foregroundColor(netRules.captureEnabled ? .green : .secondary)
                 } header: { Text("パケット層ダウンロード（実験）") }
 
+                Section {
+                    if !netRules.sessionActive {
+                        Button("取り込み開始（この後に動画を再生）") { netRules.startCaptureSession() }
+                        Text("開始後に対象の動画を再生してください。流れるセグメントを取り込み、同一ストリームごとに1ファイルへ結合します。")
+                            .font(.system(size: 11)).foregroundColor(.secondary)
+                    } else {
+                        Label("取り込み中… 再生が終わったら「完了」", systemImage: "record.circle.fill").foregroundColor(.red)
+                        Button("完了（結合ファイルを書き出す）") { netRules.stopCaptureSession() }
+                    }
+                } header: { Text("動画取り込み（セグメント結合）") }
+
                 Section("ルールを追加") {
                     Picker("種類", selection: $newAction) {
                         ForEach(NetAction.allCases) { Text($0.title).tag($0) }

@@ -50,6 +50,8 @@ final class NetRuleStore: ObservableObject {
     @Published private(set) var version = 0
     /// パケット層キャプチャ（自前Cプロキシ経由、iOS17+）。iOSはOpenSSL非搭載のため平文HTTPのみ。
     @Published var captureEnabled: Bool { didSet { d.set(captureEnabled, forKey: "chm_capture_on"); applyProxyCapture() } }
+    /// 取り込みセッション（同一動画のセグメントを1ファイルに結合）
+    @Published private(set) var sessionActive = false
 
     private let d = UserDefaults.standard
     private var url: URL {
@@ -63,6 +65,23 @@ final class NetRuleStore: ObservableObject {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
+    /// 取り込みセッションの保存先（Documents/ChamaeleonDownloads/session）
+    var sessionDir: URL {
+        let d = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ChamaeleonDownloads/session", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }
+    func startCaptureSession() {
+        if !captureEnabled { captureEnabled = true }
+        chm_proxy_session_start(sessionDir.path)
+        sessionActive = true
+    }
+    func stopCaptureSession() {
+        chm_proxy_session_stop()
+        sessionActive = false
+    }
+
     /// 自前Cプロキシを起動し WKWebView を経由させ、メディアをキャプチャ（iOS17+）
     func applyProxyCapture() {
         if #available(iOS 17.0, *) {
