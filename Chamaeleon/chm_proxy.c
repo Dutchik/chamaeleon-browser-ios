@@ -14,6 +14,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <openssl/evp.h>   // AES-128 HLS 復号（鍵がプレイリストに載る合法な暗号化のみ）
 
 static int g_listen = -1;
 static int g_running = 0;
@@ -112,6 +113,12 @@ typedef struct chm_stream {
     unsigned char *init; long initlen; // fMP4の初期化セグメント（先頭に置く）
     FILE *media; char *mediapath;      // メディアセグメントを到着順に追記する一時ファイル
     int idx;
+    // AES-128 HLS（#EXT-X-KEY で鍵URLがプレイリストに載る合法な暗号化のみ）
+    int enc;                           // 1: AES-128暗号化ストリーム
+    char keyurl[700];                  // 鍵の絶対URL
+    unsigned char aeskey[16]; int haskey;
+    unsigned char iv[16]; int hasiv;   // 明示IV（無ければセグメント連番をIVに）
+    long segidx;
     struct chm_stream *next;
 } chm_stream;
 static chm_stream *g_streams = NULL;
@@ -199,8 +206,77 @@ static chm_stream *stream_for(const char *key) {
     return s;
 }
 
+// ---- AES-128 HLS（鍵URLがプレイリストに載る合法な暗号化のみ。DRM=鍵秘匿方式は対象外） ----
+
+static int hexval(char c){ if(c>='0'&&c<='9')return c-'0'; c|=32; if(c>='a'&&c<='f')return c-'a'+10; return -1; }
+static int parse_hex(const char *s, unsigned char *out, int maxlen){
+    if(s[0]=='0'&&(s[1]=='x'||s[1]=='X')) s+=2;
+    int n=0; while(n<maxlen){ int h=hexval(s[0]); if(h<0)break; int l=hexval(s[1]); if(l<0)break; out[n++]=(unsigned char)((h<<4)|l); s+=2; }
+    return n;
+}
+static void resolve_url(const char *base, const char *ref, char *out, size_t olen){
+    if(strncmp(ref,"http",4)==0){ snprintf(out,olen,"%s",ref); return; }
+    const char *p=strstr(base,"://");
+    if(p){
+        const char *h=p+3; const char *slash=strchr(h,'/');
+        int hostlen = slash? (int)(slash-base) : (int)strlen(base);
+        char host[600]; snprintf(host,sizeof(host),"%.*s",hostlen,base);
+        if(ref[0]=='/'){ snprintf(out,olen,"%s%s",host,ref); return; }
+        char dir[750]; snprintf(dir,sizeof(dir),"%s",base); char *q=strpbrk(dir,"?#"); if(q)*q=0;
+        char *ls=strrchr(dir,'/'); if(ls) ls[1]=0; snprintf(out,olen,"%s%s",dir,ref); return;
+    }
+    if(ref[0]=='/'){ snprintf(out,olen,"%s",ref); return; }
+    char dir[750]; snprintf(dir,sizeof(dir),"%s",base); char *q=strpbrk(dir,"?#"); if(q)*q=0;
+    char *ls=strrchr(dir,'/'); if(ls) ls[1]=0; else { dir[0]=0; }
+    snprintf(out,olen,"%s%s",dir,ref);
+}
+static int aes128cbc_decrypt(const unsigned char *key,const unsigned char *iv,const unsigned char *in,long inlen,unsigned char *out,long *outlen){
+    if(inlen<=0 || inlen%16!=0) return 0;
+    EVP_CIPHER_CTX *c=EVP_CIPHER_CTX_new(); if(!c) return 0;
+    int l1=0,l2=0,ok=0;
+    if(EVP_DecryptInit_ex(c,EVP_aes_128_cbc(),NULL,key,iv)==1 &&
+       EVP_DecryptUpdate(c,out,&l1,in,(int)inlen)==1 &&
+       EVP_DecryptFinal_ex(c,out+l1,&l2)==1) ok=1;
+    EVP_CIPHER_CTX_free(c); *outlen=l1+l2; return ok;
+}
+// #EXTM3U から EXT-X-KEY を解析し、セグメントのディレクトリ stream に鍵URL/IVを登録
+static chm_stream *stream_for(const char *key);
+static void parse_m3u8(const char *m3u8url, const char *body, long n){
+    char key[600]={0}; snprintf(key,sizeof(key),"%s",m3u8url); char *q=strpbrk(key,"?#"); if(q)*q=0;
+    char *slash=strrchr(key,'/'); if(slash)*slash=0;
+    char method[24]={0}, uri[600]={0}, ivs[64]={0};
+    const char *p=body, *end=body+n;
+    while(p<end){
+        const char *nl=memchr(p,'\n',end-p); long ll = nl? nl-p : end-p;
+        if(ll>=11 && strncmp(p,"#EXT-X-KEY:",11)==0){
+            char line[1024]; int cl=(int)(ll<1023?ll:1023); memcpy(line,p,cl); line[cl]=0;
+            char *mp=strstr(line,"METHOD="); if(mp) sscanf(mp+7,"%23[^,\r\n]",method);
+            char *up=strstr(line,"URI=\""); if(up) sscanf(up+5,"%599[^\"]",uri);
+            char *ip=strstr(line,"IV="); if(ip) sscanf(ip+3,"%63[^,\r\n]",ivs);
+        }
+        p = nl? nl+1 : end;
+    }
+    if(uri[0] && (method[0]==0 || strncasecmp(method,"AES-128",7)==0)){
+        chm_stream *s=stream_for(key); s->enc=1;
+        resolve_url(m3u8url, uri, s->keyurl, sizeof(s->keyurl));
+        if(ivs[0]){ unsigned char t[16]; if(parse_hex(ivs,t,16)==16){ memcpy(s->iv,t,16); s->hasiv=1; } }
+    }
+}
+
 // url_hint と拡張子から「ストリームキー(=ディレクトリ)」を決め、内容を分類して結合（要ロック済）
 static void session_append(const char *url_hint, const char *ext, const char *body, long bodylen) {
+    // 0) m3u8 プレイリスト → 鍵情報を登録（本文は参照用に個別保存）
+    if (bodylen >= 7 && memcmp(body, "#EXTM3U", 7) == 0) {
+        if (url_hint) parse_m3u8(url_hint, body, bodylen);
+        save_individual(url_hint, "m3u8", body, bodylen);
+        return;
+    }
+    // 1) 鍵レスポンス（登録済みkeyurlと一致・16バイト）→ 鍵として保持（保存しない）
+    if (url_hint && bodylen == 16) {
+        for (chm_stream *s = g_streams; s; s = s->next)
+            if (s->enc && s->keyurl[0] && strcmp(s->keyurl, url_hint) == 0) { memcpy(s->aeskey, body, 16); s->haskey = 1; return; }
+    }
+
     char key[600] = {0};
     if (url_hint && *url_hint) {
         snprintf(key, sizeof(key), "%s", url_hint);
@@ -232,7 +308,21 @@ static void session_append(const char *url_hint, const char *ext, const char *bo
         free(s->init); s->init = (unsigned char *)malloc(bodylen); memcpy(s->init, body, bodylen); s->initlen = bodylen;
     } else {
         if (isFmp4Media) s->fmp4 = 1;
-        if (s->media) { fwrite(body, 1, (size_t)bodylen, s->media); fflush(s->media); }
+        if (s->media) {
+            if (s->enc && s->haskey && !s->fmp4) {
+                // AES-128-CBC 復号（IVは明示 or セグメント連番）
+                unsigned char iv[16];
+                if (s->hasiv) memcpy(iv, s->iv, 16);
+                else { memset(iv, 0, 16); long q = s->segidx; iv[12]=(q>>24)&0xff; iv[13]=(q>>16)&0xff; iv[14]=(q>>8)&0xff; iv[15]=q&0xff; }
+                unsigned char *dec = (unsigned char *)malloc(bodylen > 0 ? bodylen : 1); long dl = 0;
+                if (aes128cbc_decrypt(s->aeskey, iv, ub, bodylen, dec, &dl)) fwrite(dec, 1, (size_t)dl, s->media);
+                else fwrite(body, 1, (size_t)bodylen, s->media);
+                free(dec); s->segidx++;
+            } else {
+                fwrite(body, 1, (size_t)bodylen, s->media);
+            }
+            fflush(s->media);
+        }
     }
     g_sessbytes += bodylen;
 }
