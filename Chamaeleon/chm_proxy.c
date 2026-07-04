@@ -105,22 +105,71 @@ static char *dechunk(const char *b, long n, long *outlen, int *complete) {
 static int  g_session = 0;
 static char g_sessdir[1024] = {0};
 static long g_sessbytes = 0;
-typedef struct chm_stream { char *key; FILE *f; char *path; struct chm_stream *next; } chm_stream;
+// 1ストリーム = 同一配信。fMP4は init を分離保持し、完了時に init+media で結合。
+typedef struct chm_stream {
+    char *key;
+    int fmp4;                          // 1: fMP4(moof/init あり) → 出力.mp4 / 0: TS等 → .ts
+    unsigned char *init; long initlen; // fMP4の初期化セグメント（先頭に置く）
+    FILE *media; char *mediapath;      // メディアセグメントを到着順に追記する一時ファイル
+    int idx;
+    struct chm_stream *next;
+} chm_stream;
 static chm_stream *g_streams = NULL;
 static int g_stream_count = 0;
+static void sanitize(char *s);
+
+// ISO BMFF のトップレベルに fourcc ボックスがあるか（先頭チャンクを走査）
+static int iso_has_box(const unsigned char *b, long n, const char *fourcc) {
+    long i = 0;
+    while (i + 8 <= n) {
+        unsigned long sz = ((unsigned long)(unsigned char)b[i] << 24) | ((unsigned char)b[i+1] << 16) |
+                           ((unsigned char)b[i+2] << 8) | (unsigned char)b[i+3];
+        if (memcmp(b + i + 4, fourcc, 4) == 0) return 1;
+        if (sz < 8) break;                 // 0/1(64bit拡張) は打ち切り
+        if (sz > (unsigned long)(n - i)) break;
+        i += (long)sz;
+    }
+    return 0;
+}
+
+static void free_streams(void) {
+    for (chm_stream *s = g_streams; s;) {
+        chm_stream *n = s->next;
+        if (s->media) fclose(s->media);
+        if (s->mediapath) { remove(s->mediapath); free(s->mediapath); }
+        free(s->key); free(s->init); free(s); s = n;
+    }
+    g_streams = NULL; g_stream_count = 0;
+}
 
 void chm_proxy_session_start(const char *dir) {
     pthread_mutex_lock(&g_lock);
     if (dir) snprintf(g_sessdir, sizeof(g_sessdir), "%s", dir);
-    // 既存ストリームを閉じる
-    for (chm_stream *s = g_streams; s;) { chm_stream *n = s->next; if (s->f) fclose(s->f); free(s->key); free(s->path); free(s); s = n; }
-    g_streams = NULL; g_stream_count = 0; g_sessbytes = 0; g_session = 1;
+    free_streams();
+    g_sessbytes = 0; g_session = 1;
     pthread_mutex_unlock(&g_lock);
 }
+
+// 完了: 各ストリームを init + media で結合して最終ファイルに書き出す
 void chm_proxy_session_stop(void) {
     pthread_mutex_lock(&g_lock);
     g_session = 0;
-    for (chm_stream *s = g_streams; s; s = s->next) { if (s->f) { fclose(s->f); s->f = NULL; } }
+    for (chm_stream *s = g_streams; s; s = s->next) {
+        if (s->media) { fclose(s->media); s->media = NULL; }
+        char fname[620]; snprintf(fname, sizeof(fname), "%s", s->key); sanitize(fname);
+        char out[1400];
+        snprintf(out, sizeof(out), "%s/stream_%d_%.180s.%s", g_sessdir, s->idx, fname, s->fmp4 ? "mp4" : "ts");
+        FILE *o = fopen(out, "wb");
+        if (o) {
+            if (s->init && s->initlen > 0) fwrite(s->init, 1, (size_t)s->initlen, o);  // init を先頭に
+            if (s->mediapath) {
+                FILE *m = fopen(s->mediapath, "rb");
+                if (m) { char buf[65536]; size_t r; while ((r = fread(buf, 1, sizeof(buf), m)) > 0) fwrite(buf, 1, r, o); fclose(m); }
+            }
+            fclose(o);
+        }
+    }
+    free_streams();
     pthread_mutex_unlock(&g_lock);
 }
 int  chm_proxy_session_active(void) { return g_session; }
@@ -129,9 +178,29 @@ long chm_proxy_session_bytes(void) { pthread_mutex_lock(&g_lock); long b = g_ses
 
 static void sanitize(char *s) { for (; *s; s++) if (*s == '/' || *s == ':' || *s == '?' || *s == '#' || *s == '&' || *s == '=' || *s == ' ') *s = '_'; }
 
-// url_hint と拡張子から「ストリームキー(=ディレクトリ)」とファイル名を決めて追記（要ロック済）
+static void save_individual(const char *url_hint, const char *ext, const char *body, long bodylen) {
+    long idx = ++g_capcount;
+    char base[300] = {0};
+    const char *nm = url_hint ? (strrchr(url_hint, '/') ? strrchr(url_hint, '/') + 1 : url_hint) : "";
+    snprintf(base, sizeof(base), "%.200s", nm); char *q = strpbrk(base, "?#"); if (q) *q = 0;
+    char path[1400];
+    if (base[0] && strchr(base, '.')) snprintf(path, sizeof(path), "%s/%ld_%s", g_sessdir, idx, base);
+    else snprintf(path, sizeof(path), "%s/%ld.%s", g_sessdir, idx, ext);
+    FILE *f = fopen(path, "wb"); if (f) { fwrite(body, 1, (size_t)bodylen, f); fclose(f); g_sessbytes += bodylen; }
+}
+
+static chm_stream *stream_for(const char *key) {
+    for (chm_stream *s = g_streams; s; s = s->next) if (strcmp(s->key, key) == 0) return s;
+    chm_stream *s = (chm_stream *)calloc(1, sizeof(chm_stream));
+    s->key = strdup(key); s->idx = g_stream_count + 1;
+    char tmp[1400]; snprintf(tmp, sizeof(tmp), "%s/.stream_%d.mediatmp", g_sessdir, s->idx);
+    s->mediapath = strdup(tmp); s->media = fopen(tmp, "wb");
+    s->next = g_streams; g_streams = s; g_stream_count++;
+    return s;
+}
+
+// url_hint と拡張子から「ストリームキー(=ディレクトリ)」を決め、内容を分類して結合（要ロック済）
 static void session_append(const char *url_hint, const char *ext, const char *body, long bodylen) {
-    // キー: URLのディレクトリ部（最後の '/' より前）＋クエリ除去。同キーは同一ファイルに結合。
     char key[600] = {0};
     if (url_hint && *url_hint) {
         snprintf(key, sizeof(key), "%s", url_hint);
@@ -140,36 +209,32 @@ static void session_append(const char *url_hint, const char *ext, const char *bo
     }
     if (!key[0]) snprintf(key, sizeof(key), "single");
 
-    int isSeg = (strcmp(ext, "ts") == 0 || strcmp(ext, "m4s") == 0 || strcmp(ext, "mp4") == 0 ||
-                 strcmp(ext, "m4a") == 0 || strcmp(ext, "aac") == 0 || strcmp(ext, "bin") == 0);
-    if (!isSeg) {
-        // 単体メディア（画像等）は個別ファイル
-        long idx = ++g_capcount;
-        char base[300] = {0};
-        const char *nm = url_hint ? (strrchr(url_hint, '/') ? strrchr(url_hint, '/') + 1 : url_hint) : "";
-        snprintf(base, sizeof(base), "%.200s", nm); char *q = strpbrk(base, "?#"); if (q) *q = 0;
-        char path[1400];
-        if (base[0] && strchr(base, '.')) snprintf(path, sizeof(path), "%s/%ld_%s", g_sessdir, idx, base);
-        else snprintf(path, sizeof(path), "%s/%ld.%s", g_sessdir, idx, ext);
-        FILE *f = fopen(path, "wb"); if (f) { fwrite(body, 1, (size_t)bodylen, f); fclose(f); g_sessbytes += bodylen; }
-        return;
+    const unsigned char *ub = (const unsigned char *)body;
+    int is_ts   = (bodylen > 0 && ub[0] == 0x47);
+    int moof    = iso_has_box(ub, bodylen, "moof");
+    int ftyp    = iso_has_box(ub, bodylen, "ftyp");
+    int mdat    = iso_has_box(ub, bodylen, "mdat");
+    int isInit  = (ftyp && !moof && !mdat);           // fMP4 初期化セグメント(ftyp+moov、mdat無し)
+    int isFmp4Media = moof;                            // fMP4 メディア(styp/moof/mdat)
+    int isWhole = (ftyp && mdat && !moof);             // プログレッシブmp4（単体ファイル）
+    int isSegExt = (!strcmp(ext, "ts") || !strcmp(ext, "m4s") || !strcmp(ext, "m4a") || !strcmp(ext, "aac"));
+
+    if (isWhole) { save_individual(url_hint, "mp4", body, bodylen); return; }
+    if (!is_ts && !isFmp4Media && !isInit && !isSegExt) {
+        // 画像やその他の単体メディア
+        save_individual(url_hint, ext, body, bodylen); return;
     }
-    // セグメント → 同キーのストリームに追記
-    for (chm_stream *s = g_streams; s; s = s->next) {
-        if (strcmp(s->key, key) == 0) {
-            if (s->f) { fwrite(body, 1, (size_t)bodylen, s->f); fflush(s->f); g_sessbytes += bodylen; }
-            return;
-        }
+
+    chm_stream *s = stream_for(key);
+    if (isInit) {
+        // 初期化セグメントは分離保持（完了時に先頭へ）。到着順に依らず init が先頭になる
+        s->fmp4 = 1;
+        free(s->init); s->init = (unsigned char *)malloc(bodylen); memcpy(s->init, body, bodylen); s->initlen = bodylen;
+    } else {
+        if (isFmp4Media) s->fmp4 = 1;
+        if (s->media) { fwrite(body, 1, (size_t)bodylen, s->media); fflush(s->media); }
     }
-    // 新規ストリーム
-    chm_stream *s = (chm_stream *)malloc(sizeof(chm_stream));
-    s->key = strdup(key);
-    char fname[620]; snprintf(fname, sizeof(fname), "%s", key); sanitize(fname);
-    char path[1400]; snprintf(path, sizeof(path), "%s/stream_%d_%.200s.%s", g_sessdir, g_stream_count + 1, fname, ext);
-    s->path = strdup(path);
-    s->f = fopen(path, "wb");
-    s->next = g_streams; g_streams = s; g_stream_count++;
-    if (s->f) { fwrite(body, 1, (size_t)bodylen, s->f); fflush(s->f); g_sessbytes += bodylen; }
+    g_sessbytes += bodylen;
 }
 
 // 応答がメディアならボディをキャプチャ保存
