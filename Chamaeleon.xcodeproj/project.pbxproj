@@ -14,6 +14,7 @@
 		298FA1C0E5494CAFCF84D487 /* Downloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65E8B43B0467330126C1F46C /* Downloader.swift */; };
 		3B02B51844AB6EA2A616BBAC /* chm_mitm.c in Sources */ = {isa = PBXBuildFile; fileRef = B4711269CFFAC351E83D3D07 /* chm_mitm.c */; };
 		4039E4108CAFAA9E1DD5F5C4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFF6B0836E900A30342E0501 /* ContentView.swift */; };
+		418FC7712DF41836FFDE5623 /* OpenSSL.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1372ECCBF40A586C4DE1D509 /* OpenSSL.xcframework */; };
 		4417805D544535FA9509D33A /* ChamaeleonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F461DC464DB648E236420F /* ChamaeleonApp.swift */; };
 		4A7E30A3E3D7F3C4E482F45D /* HomeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2890385F303105C17FCFBEF5 /* HomeSettingsView.swift */; };
 		6901736BB7D8B3ABD9BB788E /* ChamaeleonAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F50170434CFF214B731F038 /* ChamaeleonAgent.swift */; };
@@ -34,6 +35,7 @@
 /* Begin PBXFileReference section */
 		0801B4DA839C7757AA452DFA /* Chamaeleon.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chamaeleon.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0906CF5D6A93B48E8628F248 /* chm_proxy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = chm_proxy.h; sourceTree = "<group>"; };
+		1372ECCBF40A586C4DE1D509 /* OpenSSL.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = OpenSSL.xcframework; path = Vendor/OpenSSL.xcframework; sourceTree = "<group>"; };
 		1E4779EC0403DAA74E9248CB /* HomeExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeExtras.swift; sourceTree = "<group>"; };
 		1F50170434CFF214B731F038 /* ChamaeleonAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChamaeleonAgent.swift; sourceTree = "<group>"; };
 		2890385F303105C17FCFBEF5 /* HomeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSettingsView.swift; sourceTree = "<group>"; };
@@ -61,7 +63,26 @@
 		EFF6B0836E900A30342E0501 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		C35592589B1DC646C117E423 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				418FC7712DF41836FFDE5623 /* OpenSSL.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
+		161C2C88D2FC5B9C86CEFD87 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1372ECCBF40A586C4DE1D509 /* OpenSSL.xcframework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		61AA098F66518A615FD336B9 /* Chamaeleon */ = {
 			isa = PBXGroup;
 			children = (
@@ -107,6 +128,7 @@
 			isa = PBXGroup;
 			children = (
 				61AA098F66518A615FD336B9 /* Chamaeleon */,
+				161C2C88D2FC5B9C86CEFD87 /* Frameworks */,
 				A19D4CD2AC83AF41FDE2E511 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -120,6 +142,7 @@
 			buildPhases = (
 				1DFB882B46D46F2FA16D43DF /* Sources */,
 				394E75C0CDF2A84618F9E2A7 /* Resources */,
+				C35592589B1DC646C117E423 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -214,6 +237,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"Vendor\"",
+				);
+				HEADER_SEARCH_PATHS = "$(inherited) $(PROJECT_DIR)/Vendor/OpenSSL.xcframework/ios-arm64/Headers $(PROJECT_DIR)/Vendor/OpenSSL.xcframework/ios-arm64-simulator/Headers";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -234,6 +263,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"Vendor\"",
+				);
+				HEADER_SEARCH_PATHS = "$(inherited) $(PROJECT_DIR)/Vendor/OpenSSL.xcframework/ios-arm64/Headers $(PROJECT_DIR)/Vendor/OpenSSL.xcframework/ios-arm64-simulator/Headers";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

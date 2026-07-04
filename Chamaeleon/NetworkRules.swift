@@ -52,6 +52,9 @@ final class NetRuleStore: ObservableObject {
     @Published var captureEnabled: Bool { didSet { d.set(captureEnabled, forKey: "chm_capture_on"); applyProxyCapture() } }
     /// 取り込みセッション（同一動画のセグメントを1ファイルに結合）
     @Published private(set) var sessionActive = false
+    /// HTTPS も終端して取り込む（TLS MITM・自前ルート証明書、iOS17+）
+    @Published var mitmEnabled: Bool { didSet { d.set(mitmEnabled, forKey: "chm_mitm_on"); applyMitm() } }
+    private(set) var mitmCA: SecCertificate?
 
     private let d = UserDefaults.standard
     private var url: URL {
@@ -72,6 +75,31 @@ final class NetRuleStore: ObservableObject {
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         return d
     }
+    /// TLS MITM 用の CA 保存先
+    private func caDir() -> String {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Chamaeleon", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.path
+    }
+    /// HTTPS 本文の取り込みを有効化（CA生成＋WebView信頼＋プロキシへ通知、iOS17+）
+    func applyMitm() {
+        if mitmEnabled {
+            if !captureEnabled { captureEnabled = true }   // プロキシ経由が前提
+            if chm_mitm_init(caDir()) == 0 {
+                chm_proxy_set_mitm(1)
+                if let cp = chm_mitm_ca_cert_der_path() {
+                    let path = String(cString: cp)
+                    if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+                        mitmCA = SecCertificateCreateWithData(nil, data as CFData)
+                    }
+                }
+            } else { mitmEnabled = false }
+        } else {
+            chm_proxy_set_mitm(0)
+        }
+    }
+
     func startCaptureSession() {
         if !captureEnabled { captureEnabled = true }
         chm_proxy_session_start(sessionDir.path)
@@ -102,6 +130,7 @@ final class NetRuleStore: ObservableObject {
     init() {
         masterEnabled = d.object(forKey: "chm_block_on") as? Bool ?? true
         captureEnabled = d.object(forKey: "chm_capture_on") as? Bool ?? false
+        mitmEnabled = d.object(forKey: "chm_mitm_on") as? Bool ?? false
         let u = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("chamaeleon-netrules.json")
         if let data = try? Data(contentsOf: u), let v = try? JSONDecoder().decode([NetRule].self, from: data) {
@@ -111,6 +140,7 @@ final class NetRuleStore: ObservableObject {
         }
         refresh()
         applyProxyCapture()
+        applyMitm()
     }
 
     static func defaults() -> [NetRule] {

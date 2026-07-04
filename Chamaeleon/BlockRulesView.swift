@@ -28,8 +28,11 @@ struct BlockRulesView: View {
 
                 Section {
                     Toggle("パケット層キャプチャ（流れたメディアを保存）", isOn: $netRules.captureEnabled)
-                    Text("自前Cプロキシ経由で、ページを閲覧中に流れた画像・動画等を再取得せずそのまま保存します（保存先＝アプリ内 ChamaeleonDownloads/capture）。iOS 17以降。※iOSは平文HTTPのみ対応（HTTPSは今後のOpenSSL統合で対応予定）。")
+                    Text("自前Cプロキシ経由で、ページを閲覧中に流れた画像・動画等を再取得せずそのまま保存します（保存先＝アプリ内 ChamaeleonDownloads/capture）。iOS 17以降。")
                         .font(.system(size: 11)).foregroundColor(netRules.captureEnabled ? .green : .secondary)
+                    Toggle("HTTPSも取り込む（TLS MITM）", isOn: $netRules.mitmEnabled)
+                    Text("自前ルート証明書を生成し、このアプリのWebViewだけが信頼してHTTPSを終端します（システムには入れません）。HTTPS動画の取り込みに必要。実験機能。")
+                        .font(.system(size: 11)).foregroundColor(netRules.mitmEnabled ? .orange : .secondary)
                 } header: { Text("パケット層ダウンロード（実験）") }
 
                 Section {

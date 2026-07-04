@@ -119,6 +119,23 @@ struct BrowserView: UIViewRepresentable {
             vc.present(a, animated: true)
         }
 
+        // TLS MITM 時: 自前CAで署名したリーフ証明書を信頼する
+        func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge,
+                     completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+            guard netRules.mitmEnabled,
+                  challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+                  let trust = challenge.protectionSpace.serverTrust, let ca = netRules.mitmCA else {
+                completionHandler(.performDefaultHandling, nil); return
+            }
+            SecTrustSetAnchorCertificates(trust, [ca] as CFArray)
+            SecTrustSetAnchorCertificatesOnly(trust, false)
+            if SecTrustEvaluateWithError(trust, nil) {
+                completionHandler(.useCredential, URLCredential(trust: trust))
+            } else {
+                completionHandler(.performDefaultHandling, nil)
+            }
+        }
+
         // メインフレームのナビゲーションを C エンジンで判定してブロック（http(s)のみ対象）
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
