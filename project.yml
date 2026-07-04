@@ -33,6 +33,6 @@ targets:
         PRODUCT_NAME: Chamaeleon
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_OBJC_BRIDGING_HEADER: Chamaeleon/Chamaeleon-Bridging-Header.h
-        SUPPORTS_MACCATALYST: YES
-        DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: YES
-        MACOSX_DEPLOYMENT_TARGET: "13.0"
+        # Mac Catalyst は廃止（ネイティブMac版 chamaeleon-browser-mac が担当）。
+        # 同梱OpenSSL(iOS用)はmaccatalystスライスを持たないため無効化。
+        SUPPORTS_MACCATALYST: NO
