@@ -16,6 +16,7 @@
 		4039E4108CAFAA9E1DD5F5C4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFF6B0836E900A30342E0501 /* ContentView.swift */; };
 		418FC7712DF41836FFDE5623 /* OpenSSL.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1372ECCBF40A586C4DE1D509 /* OpenSSL.xcframework */; };
 		4417805D544535FA9509D33A /* ChamaeleonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F461DC464DB648E236420F /* ChamaeleonApp.swift */; };
+		449ABFC14CC6AC0DADEFCC93 /* ScreenRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6BEFC45462C60428D1E52C3 /* ScreenRecorder.swift */; };
 		4A7E30A3E3D7F3C4E482F45D /* HomeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2890385F303105C17FCFBEF5 /* HomeSettingsView.swift */; };
 		6901736BB7D8B3ABD9BB788E /* ChamaeleonAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F50170434CFF214B731F038 /* ChamaeleonAgent.swift */; };
 		6FEC22FB8B0B34C6C5B1F7E5 /* NetworkRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDC9A7690550BC02C5E3F26 /* NetworkRules.swift */; };
@@ -50,6 +51,7 @@
 		89CA9BF065A624B65DA96331 /* chm_mitm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = chm_mitm.h; sourceTree = "<group>"; };
 		990A3786A5DA6ECF1C451A2B /* InlineEditors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineEditors.swift; sourceTree = "<group>"; };
 		9DD2F935DF7A32E3804D4ECB /* AutomationViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationViews.swift; sourceTree = "<group>"; };
+		A6BEFC45462C60428D1E52C3 /* ScreenRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecorder.swift; sourceTree = "<group>"; };
 		A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePanelView.swift; sourceTree = "<group>"; };
 		B2F461DC464DB648E236420F /* ChamaeleonApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChamaeleonApp.swift; sourceTree = "<group>"; };
 		B4711269CFFAC351E83D3D07 /* chm_mitm.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = chm_mitm.c; sourceTree = "<group>"; };
@@ -110,6 +112,7 @@
 				534865698659E829E6586B49 /* Models.swift */,
 				DDDC9A7690550BC02C5E3F26 /* NetworkRules.swift */,
 				4B5C2BAFC628369A05ED7A02 /* RightDock.swift */,
+				A6BEFC45462C60428D1E52C3 /* ScreenRecorder.swift */,
 				A7F038D9200E4F792CAA06C3 /* SitePanelView.swift */,
 				BEAF0272A211B254419A134C /* StartView.swift */,
 			);
@@ -220,6 +223,7 @@
 				085496E0265E938FA1D5996B /* Models.swift in Sources */,
 				6FEC22FB8B0B34C6C5B1F7E5 /* NetworkRules.swift in Sources */,
 				84208A03312190389505DA95 /* RightDock.swift in Sources */,
+				449ABFC14CC6AC0DADEFCC93 /* ScreenRecorder.swift in Sources */,
 				EF8024589AEF48D973ACF5B4 /* SitePanelView.swift in Sources */,
 				9F60AFBE56472356BE1AC52B /* StartView.swift in Sources */,
 				3B02B51844AB6EA2A616BBAC /* chm_mitm.c in Sources */,

@@ -172,6 +172,7 @@ struct BrowserView: UIViewRepresentable {
                 onVisit?(url, webView.title ?? "")
                 model.matchedCount = store.matched(for: url).count
                 if model.recording { model.injectRecorder() }
+                model.injectVideoOverlay()
                 model.finishNav()
             }
         }
@@ -189,6 +190,8 @@ struct BrowserView: UIViewRepresentable {
                 case "inspected":
                     let styles = body["styles"] as? [String: String] ?? [:]
                     model.onInspected?(InspectedInfo(selector: body["selector"] as? String ?? "", styles: styles))
+                case "videoMenu":
+                    model.onVideoMenu?(body["src"] as? String ?? "")
                 default: break
                 }
             }
@@ -215,7 +218,10 @@ final class BrowserModel: ObservableObject, Identifiable {
 
     var onRecorded: ((RecordedStep) -> Void)?
     var onInspected: ((InspectedInfo) -> Void)?
+    var onVideoMenu: ((String) -> Void)?     // 動画バッジ押下（src）
     private var navCont: CheckedContinuation<Void, Never>?
+
+    func injectVideoOverlay() { webView?.evaluateJavaScript(BrowserJS.videoOverlay) }
 
     init(home: Bool = true, url: String = "about:blank") {
         urlString = url; urlInput = home ? "" : url; currentURL = home ? "chamaeleon://start" : url; isHome = home
@@ -366,6 +372,27 @@ enum PatchEngine {
 
 /// webページに注入するJavaScript群
 enum BrowserJS {
+    // 動画要素の右上に「⤓」バッジを重ね、押すとネイティブのキャプチャメニューを開く
+    static let videoOverlay = """
+    (function(){
+      if(window.__chmVidInit)return; window.__chmVidInit=true;
+      function tag(v){
+        if(v.__chmTagged)return; v.__chmTagged=true;
+        var b=document.createElement('div'); b.textContent='⤓';
+        b.style.cssText='position:absolute;z-index:2147483647;top:8px;right:8px;width:34px;height:34px;line-height:34px;text-align:center;border-radius:17px;background:rgba(53,194,106,.92);color:#fff;font:700 18px -apple-system,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.35)';
+        b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();
+          var src=v.currentSrc||v.src||'';
+          window.webkit.messageHandlers.chm.postMessage({kind:'videoMenu',src:src});},true);
+        var p=v.parentElement||document.body;
+        if(getComputedStyle(p).position==='static') p.style.position='relative';
+        p.appendChild(b);
+      }
+      function scan(){document.querySelectorAll('video').forEach(tag);}
+      scan();
+      try{ new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true}); }catch(e){}
+    })();
+    """
+
     // 安定セレクタ生成: id / data-* / name / aria-label / 安定クラスを優先し、
     // 必要なときだけ nth-of-type にフォールバック（自動化・スタイル編集の再現性向上）
     static let selJS = """

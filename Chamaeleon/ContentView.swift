@@ -32,6 +32,9 @@ struct ContentView: View {
     @State private var showHomeSettings = false
     @State private var showBlock = false
     @State private var showDownloader = false
+    @State private var videoMenuSrc: String?
+    @StateObject private var screenRecorder = ScreenRecorder()
+    @State private var captureToast: String?
     @State private var editor: InlineEditor = .none      // 下部スタイル編集パネル
     @State private var dockExpanded = false              // 右ドックの展開状態
     @State private var wizardFlow: Flow?
@@ -104,9 +107,32 @@ struct ContentView: View {
                 .allowsHitTesting(false)
                 .transition(.opacity)
             }
+            // 取り込み中／画面録画中のフローティングバー
+            VStack {
+                Spacer()
+                if netRules.sessionActive {
+                    captureBar("取り込み中… 再生後に完了", color: .green, button: "完了") {
+                        netRules.stopCaptureSession(); captureToast = "取り込みを保存しました"
+                    }
+                } else if screenRecorder.recording {
+                    captureBar("画面録画中…", color: .red, button: "停止") { screenRecorder.stop() }
+                } else if let t = captureToast {
+                    Text(t).font(.system(size: 13, weight: .medium)).padding(.horizontal, 16).padding(.vertical, 10)
+                        .background(.regularMaterial).clipShape(Capsule()).padding(.bottom, 26)
+                        .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + 3) { captureToast = nil } }
+                }
+            }.frame(maxWidth: .infinity)
         }
         .tint(accent)
         .onAppear { if tabs.isEmpty { tabs = [BrowserTab(home: true)] } }
+        .confirmationDialog("動画のキャプチャ", isPresented: Binding(
+            get: { videoMenuSrc != nil }, set: { if !$0 { videoMenuSrc = nil } }), titleVisibility: .visible) {
+            Button("この動画を取り込み（m3u8対応）") { startVideoCapture() }
+            Button("画面録画を開始") { screenRecorder.start() }
+            Button("キャンセル", role: .cancel) { videoMenuSrc = nil }
+        } message: {
+            Text("パケット層で動画を取り込みます（HTTPSはブロック設定でMITM ON）。または画面録画します。私的利用の範囲でご利用ください。")
+        }
         .sheet(isPresented: $showHomeSettings) { HomeSettingsView(settings: settings) }
         .sheet(isPresented: $showPanel) {
             if let m = active {
@@ -152,7 +178,8 @@ struct ContentView: View {
                              flowStore: flowStore, splitStore: splitStore, netRules: netRules, accent: accent,
                              onRunFlow: { flow, model in runFlow(flow, model: model) },
                              onOpenSplit: { cfg in openSplit(cfg) },
-                             onNewSplit: { splitTab(.horizontal) })
+                             onNewSplit: { splitTab(.horizontal) },
+                             onVideoMenu: { src in videoMenuSrc = src })
                     .opacity(index == activeIndex ? 1 : 0)
                     .allowsHitTesting(index == activeIndex)
             }
@@ -213,6 +240,25 @@ struct ContentView: View {
         if active?.isHome == true { return }
         editor = .style
         dockExpanded = true       // 右から設定パネルを出す
+    }
+
+    private func captureBar(_ text: String, color: Color, button: String, _ action: @escaping () -> Void) -> some View {
+        HStack(spacing: 10) {
+            Circle().fill(color).frame(width: 9, height: 9)
+            Text(text).font(.system(size: 13, weight: .semibold))
+            Spacer()
+            Button(button, action: action).buttonStyle(.borderedProminent).tint(color)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(.regularMaterial).clipShape(Capsule())
+        .padding(.horizontal, 12).padding(.bottom, 24)
+    }
+
+    private func startVideoCapture() {
+        videoMenuSrc = nil
+        netRules.startCaptureSession()   // プロキシ＋キャプチャ＋セッション開始
+        active?.webView?.reload()        // 再生し直してセグメントをプロキシ経由に
+        captureToast = "取り込み開始。動画を再生してください"
     }
 
     private func closeTab(at index: Int) {
@@ -335,6 +381,7 @@ private struct TabPanesView: View {
     let onRunFlow: (Flow, BrowserModel) -> Void
     let onOpenSplit: (SplitConfig) -> Void
     let onNewSplit: () -> Void
+    let onVideoMenu: (String) -> Void
 
     var body: some View {
         Group {
@@ -361,6 +408,7 @@ private struct TabPanesView: View {
                 }
                 ZStack {
                     BrowserView(model: model, store: store, netRules: netRules) { url, title in library.recordVisit(url: url, title: title) }
+                        .onAppear { model.onVideoMenu = { src in onVideoMenu(src) } }
                     if model.isHome {
                         StartView(settings: settings, library: library, flowStore: flowStore, splitStore: splitStore,
                                   onSearch: { model.navigate($0); tab.activePane = i },
